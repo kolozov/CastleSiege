@@ -172,7 +172,7 @@ public sealed class CastleBuilder
             return Fail(out message, "Клетка уже пуста.");
         }
         grid[col, row] = null;
-        // Опускание верхних блоков добавим следующим шагом.
+        CompactColumn(grid, col);
         message = "Блок возвращён в запас.";
         return true;
     }
@@ -181,5 +181,52 @@ public sealed class CastleBuilder
     {
         message = text;
         return false;
+    }
+
+    private static void CompactColumn(BlockType?[,] grid, int col)
+    {
+        int writeRow = 0;
+        for (int r = 0; r < GridRows; r++)
+        {
+            var cell = grid[col, r];
+            if (cell != null)
+            {
+                grid[col, r] = null;
+                grid[col, writeRow++] = cell.Value;
+            }
+        }
+    }
+
+    private static int TrimExcessBlocks(
+        BlockType?[,] grid,
+        BlockType type,
+        int maxAllowed)
+    {
+        int count = 0;
+        for (int c = 0; c < GridCols; c++)
+        {
+            for (int r = 0; r < GridRows; r++)
+            {
+                if (grid[c, r] == type) count++;
+            }
+        }
+
+        int excess = Math.Max(0, count - maxAllowed);
+        if (excess == 0) return 0;
+
+        for (int r = GridRows - 1; r >= 0 && count > maxAllowed; r--)
+        {
+            for (int c = 0; c < GridCols && count > maxAllowed; c++)
+            {
+                if (grid[c, r] == type)
+                {
+                    grid[c, r] = null;
+                    count--;
+                }
+            }
+        }
+
+        for (int c = 0; c < GridCols; c++) CompactColumn(grid, c);
+        return excess;
     }
 }
