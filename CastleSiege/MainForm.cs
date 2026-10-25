@@ -6,7 +6,22 @@ namespace CastleSiege;
 
 public sealed class MainForm : Form
 {
-    private readonly Panel _canvas = new Panel { Dock = DockStyle.Fill };
+    private sealed class BufferedCanvas : Panel
+    {
+        public BufferedCanvas()
+        {
+            DoubleBuffered = true;
+            ResizeRedraw = true;
+            SetStyle(
+                ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.UserPaint |
+                ControlStyles.OptimizedDoubleBuffer,
+                true);
+        }
+    }
+
+    private readonly BufferedCanvas _canvas =
+        new BufferedCanvas { Dock = DockStyle.Fill };
     private readonly System.Windows.Forms.Timer _frameTimer =
         new System.Windows.Forms.Timer { Interval = 16 };
     private readonly Stopwatch _clock = Stopwatch.StartNew();
