@@ -21,7 +21,7 @@ public sealed class CastleBuilder
 
     public LocationId SelectedLocation { get; set; } = LocationId.Plains;
     public BlockType SelectedBrush { get; set; } = BlockType.Wood;
-    public int WoodBudget { get; private set; } = 6;
+    public int WoodBudget { get; private set; } = 7;
     public int StoneBudget { get; private set; } = 4;
     public int SteelBudget { get; private set; } = 2;
 
@@ -33,7 +33,7 @@ public sealed class CastleBuilder
 
     public int TotalBudget => WoodBudget + StoneBudget + SteelBudget;
 
-    public CastleBuilder() { }
+    public CastleBuilder() => LoadLocationPreset(LocationId.Plains);
 
     public int GetBudget(BlockType type)
     {
@@ -102,6 +102,65 @@ public sealed class CastleBuilder
                 $"Красный — {redRemoved}.";
         }
         return true;
+    }
+
+    // Загружает стандартный шаблон локации и подгоняет бюджеты под него
+    public void LoadLocationPreset(LocationId location)
+    {
+        SelectedLocation = location;
+        LevelData.CreateDefaultGrids(location, out var blue, out var red);
+        for (int c = 0; c < GridCols; c++)
+        {
+            for (int r = 0; r < GridRows; r++)
+            {
+                BlueGrid[c, r] = blue[c, r];
+                RedGrid[c, r] = red[c, r];
+            }
+        }
+        WoodBudget = GetUsed(PlayerId.Blue, BlockType.Wood);
+        StoneBudget = GetUsed(PlayerId.Blue, BlockType.Stone);
+        SteelBudget = GetUsed(PlayerId.Blue, BlockType.Steel);
+    }
+
+    // Автоматически расставляет симметричные замки в пределах бюджета
+    public void AutoFillFromCurrentBudget()
+    {
+        ClearGrids();
+        BlueGrid[1, 0] = BlockType.King;
+        int[] cols = new int[]
+        {
+            2, 1, 2, 0, 3, 0, 1, 2, 3, 0, 3, 1, 2, 0, 3
+        };
+        int[] rows = new int[]
+        {
+            0, 1, 1, 0, 0, 1, 2, 2, 1, 2, 2, 3, 3, 3, 3
+        };
+
+        var pool = new Queue<BlockType>();
+        for (int i = 0; i < SteelBudget; i++) pool.Enqueue(BlockType.Steel);
+        for (int i = 0; i < StoneBudget; i++) pool.Enqueue(BlockType.Stone);
+        for (int i = 0; i < WoodBudget; i++) pool.Enqueue(BlockType.Wood);
+
+        for (int i = 0; i < cols.Length && pool.Count > 0; i++)
+        {
+            BlueGrid[cols[i], rows[i]] = pool.Dequeue();
+        }
+
+        for (int c = 0; c < GridCols; c++) CompactColumn(BlueGrid, c);
+
+        for (int c = 0; c < GridCols; c++)
+        {
+            for (int r = 0; r < GridRows; r++)
+            {
+                RedGrid[GridCols - 1 - c, r] = BlueGrid[c, r];
+            }
+        }
+    }
+
+    public void ClearGrids()
+    {
+        Array.Clear(BlueGrid);
+        Array.Clear(RedGrid);
     }
 
     public static RectangleF GetCellRect(PlayerId side, int col, int row)
