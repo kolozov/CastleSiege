@@ -63,6 +63,47 @@ public sealed class CastleBuilder
     public int GetRemaining(PlayerId side, BlockType type) =>
         Math.Max(0, GetBudget(type) - GetUsed(side, type));
 
+    public bool TryChangeBudget(
+        BlockType type,
+        int delta,
+        out string message)
+    {
+        if (type == BlockType.King)
+        {
+            return Fail(out message,
+                "Король всегда ровно 1 у каждого замка.");
+        }
+
+        int next = GetBudget(type) + delta;
+        if (next < 0)
+        {
+            return Fail(out message,
+                "Количество блоков не может быть меньше 0.");
+        }
+
+        if (delta > 0 && TotalBudget + delta > MaxTotalBlocks)
+        {
+            return Fail(out message,
+                $"Максимум {MaxTotalBlocks} блоков " +
+                "(плюс 1 Король) для сетки 4×4!");
+        }
+
+        if (type == BlockType.Wood) WoodBudget = next;
+        else if (type == BlockType.Stone) StoneBudget = next;
+        else if (type == BlockType.Steel) SteelBudget = next;
+
+        int blueRemoved = TrimExcessBlocks(BlueGrid, type, next);
+        int redRemoved = TrimExcessBlocks(RedGrid, type, next);
+
+        message = $"Бюджет обновлён ({TotalBudget}/{MaxTotalBlocks}).";
+        if (blueRemoved > 0 || redRemoved > 0)
+        {
+            message += $" Удалено блоков: Синий — {blueRemoved}, " +
+                $"Красный — {redRemoved}.";
+        }
+        return true;
+    }
+
     public static RectangleF GetCellRect(PlayerId side, int col, int row)
     {
         float startX = side == PlayerId.Blue ? BlueGridX : RedGridX;
@@ -174,6 +215,38 @@ public sealed class CastleBuilder
         grid[col, row] = null;
         CompactColumn(grid, col);
         message = "Блок возвращён в запас.";
+        return true;
+    }
+
+    public bool TryValidateForBattle(
+        out string errorMessage,
+        out string? unusedWarning)
+    {
+        unusedWarning = null;
+        if (GetUsed(PlayerId.Blue, BlockType.King) != 1 ||
+            GetUsed(PlayerId.Red, BlockType.King) != 1)
+        {
+            return Fail(out errorMessage,
+                "У каждого замка обязательно должен быть размещён Король!");
+        }
+
+        int blueLeft = GetRemaining(PlayerId.Blue, BlockType.Wood) +
+                       GetRemaining(PlayerId.Blue, BlockType.Stone) +
+                       GetRemaining(PlayerId.Blue, BlockType.Steel);
+        int redLeft = GetRemaining(PlayerId.Red, BlockType.Wood) +
+                      GetRemaining(PlayerId.Red, BlockType.Stone) +
+                      GetRemaining(PlayerId.Red, BlockType.Steel);
+
+        if (blueLeft > 0 || redLeft > 0)
+        {
+            unusedWarning =
+                "Использованы не все доступные блоки:\n" +
+                $"• Синий замок — осталось: {blueLeft}\n" +
+                $"• Красный замок — осталось: {redLeft}\n\n" +
+                "Всё равно начать бой с текущими замками?";
+        }
+
+        errorMessage = string.Empty;
         return true;
     }
 
