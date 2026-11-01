@@ -472,7 +472,10 @@ public sealed class GameEngine : IDisposable
                     continue;
                 }
 
-                CheckTerrainCollision(p);
+                if (!CheckBlockCollision(p))
+                {
+                    CheckTerrainCollision(p);
+                }
             }
         }
 
@@ -486,6 +489,82 @@ public sealed class GameEngine : IDisposable
         {
             if (UpdateBlockTargets()) Phase = GamePhase.Settling;
             else FinishTurnResolution();
+        }
+    }
+
+    private bool CheckBlockCollision(Projectile p)
+    {
+        foreach (var block in Level.Blocks)
+        {
+            if (block.IsDestroyed) continue;
+            RectangleF rect = block.Bounds;
+            if (!TouchesRectangle(p, rect, out float cx, out float cy))
+            {
+                continue;
+            }
+
+            ComputeBlockContact(
+                p, rect, ref cx, ref cy, out float nx, out float ny);
+            HandleSurfaceHit(p, nx, ny, cx, cy, block, Color.Orange);
+            return true;
+        }
+        return false;
+    }
+
+    private static bool TouchesRectangle(
+        Projectile p,
+        RectangleF rect,
+        out float x,
+        out float y)
+    {
+        x = Math.Clamp(p.X, rect.Left, rect.Right);
+        y = Math.Clamp(p.Y, rect.Top, rect.Bottom);
+        float dx = p.X - x;
+        float dy = p.Y - y;
+        return dx * dx + dy * dy <= p.Radius * p.Radius;
+    }
+
+    private static void ComputeBlockContact(
+        Projectile p,
+        RectangleF rect,
+        ref float x,
+        ref float y,
+        out float nx,
+        out float ny)
+    {
+        float dx = p.X - x;
+        float dy = p.Y - y;
+        float distance = MathF.Sqrt(dx * dx + dy * dy);
+
+        if (distance > 0f)
+        {
+            nx = dx / distance;
+            ny = dy / distance;
+            return;
+        }
+
+        float left = p.X - rect.Left;
+        float right = rect.Right - p.X;
+        float top = p.Y - rect.Top;
+        float bottom = rect.Bottom - p.Y;
+        float nearest = MathF.Min(
+            MathF.Min(left, right), MathF.Min(top, bottom));
+
+        if (nearest == top)
+        {
+            nx = 0f; ny = -1f; y = rect.Top;
+        }
+        else if (nearest == bottom)
+        {
+            nx = 0f; ny = 1f; y = rect.Bottom;
+        }
+        else if (nearest == left)
+        {
+            nx = -1f; ny = 0f; x = rect.Left;
+        }
+        else
+        {
+            nx = 1f; ny = 0f; x = rect.Right;
         }
     }
 
@@ -588,9 +667,122 @@ public sealed class GameEngine : IDisposable
         Block? hitBlock,
         Color sparkColor)
     {
-        p.X = x;
-        p.Y = y;
+        if (hitBlock == null)
+        {
+            p.X = x;
+            p.Y = y;
+        }
+        ExplodeProjectile(p, hitBlock);
         p.IsAlive = false;
+    }
+
+    private void ExplodeProjectile(Projectile p, Block? directBlock)
+    {
+        bool heavy = p is RicochetProjectile;
+
+        Explosions.Add(new ExplosionEffect(
+            new PointF(p.X, p.Y),
+            p.ExplosionRadius,
+            heavy ? Color.OrangeRed : Color.Gold));
+
+        TriggerShake(heavy ? 10f : 5f, heavy ? 0.28f : 0.16f);
+        // Вырезание воронок добавим следующим шагом.
+
+        if (directBlock == null)
+        {
+            SpawnDebrisBurst(
+                new PointF(p.X, p.Y - 4f),
+                8,
+                Color.FromArgb(124, 88, 56),
+                190f);
+        }
+
+        if (directBlock != null)
+        {
+            bool wasShielded = directBlock.IsKing && directBlock.HasShield;
+            if (directBlock.TakeDamage(p.DirectDamage))
+            {
+                if (wasShielded)
+                {
+                    FloatingTexts.Add(new FloatingText(
+                        "Щит снят!", directBlock.Center, Color.DeepSkyBlue));
+                    SpawnDebrisBurst(directBlock.Center, 8, Color.Cyan, 200f);
+                }
+                else
+                {
+                    SpawnBlockDebris(directBlock);
+                    if (directBlock.IsKing && directBlock.IsDestroyed)
+                    {
+                        TriggerShake(14f, 0.40f);
+                    }
+                }
+            }
+        }
+
+        float radiusSq = p.ExplosionRadius * p.ExplosionRadius;
+        foreach (var block in Level.Blocks)
+        {
+            if (block.IsDestroyed || block.IsKing || block == directBlock)
+            {
+                continue;
+            }
+
+            float dx = block.Center.X - p.X;
+            float dy = block.Center.Y - p.Y;
+            if (dx * dx + dy * dy <= radiusSq &&
+                block.TakeDamage(p.SplashDamage))
+            {
+                SpawnBlockDebris(block);
+            }
+        }
+    }
+
+    private void TriggerShake(float intensity, float duration)
+    {
+        if (intensity >= _shakeIntensity || _shakeTimer <= 0f)
+        {
+            _shakeIntensity = intensity;
+            _shakeDuration = duration;
+            _shakeTimer = duration;
+        }
+    }
+
+    private void SpawnBlockDebris(Block block)
+    {
+        Color color = block.Type switch
+        {
+            BlockType.Wood => Color.FromArgb(178, 118, 60),
+            BlockType.Stone => Color.FromArgb(148, 154, 162),
+            BlockType.Steel => Color.FromArgb(118, 134, 152),
+            _ => Color.Gold
+        };
+
+        SpawnDebrisBurst(
+            block.Center,
+            block.IsDestroyed ? 9 : 4,
+            color,
+            block.IsDestroyed ? 220f : 150f);
+    }
+
+    private void SpawnDebrisBurst(
+        PointF origin,
+        int count,
+        Color color,
+        float maxSpeed)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            float angle = -MathF.PI * (0.1f + 0.8f * _rng.NextSingle());
+            float speed = maxSpeed * (0.4f + 0.6f * _rng.NextSingle());
+            Debris.Add(new DebrisParticle(
+                origin.X,
+                origin.Y,
+                MathF.Cos(angle) * speed,
+                MathF.Sin(angle) * speed,
+                4.5f + 4f * _rng.NextSingle(),
+                (_rng.NextSingle() * 2f - 1f) * 360f,
+                color));
+        }
     }
 
     private bool UpdateBlockTargets()
@@ -632,6 +824,7 @@ public sealed class GameEngine : IDisposable
                 continue;
             }
 
+            if (block.IsKing) block.TakeDamage(1);
             block.Y = MathF.Min(block.TargetY, block.Y + 260f * dt);
             if (block.Y < block.TargetY - 0.5f)
             {

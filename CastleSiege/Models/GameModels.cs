@@ -102,3 +102,117 @@ public sealed class Block
     }
 }
 
+
+// Кратковременный эффект взрыва
+public sealed class ExplosionEffect
+{
+    public PointF Center { get; }
+    public float MaxRadius { get; }
+    public Color Color { get; }
+    public float Elapsed { get; private set; }
+    public float Duration { get; }
+    public float Progress => Math.Clamp(Elapsed / Duration, 0f, 1f);
+    public bool IsAlive => Elapsed < Duration;
+
+    public ExplosionEffect(
+        PointF center,
+        float maxRadius,
+        Color color,
+        float duration = 0.36f)
+    {
+        Center = center;
+        MaxRadius = maxRadius;
+        Color = color;
+        Duration = duration;
+    }
+
+    public void Update(float dt) => Elapsed += dt;
+}
+
+// Всплывающая надпись на поле боя
+public sealed class FloatingText
+{
+    public string Text { get; }
+    public float X { get; }
+    public float Y { get; private set; }
+    public Color Color { get; }
+    public float Elapsed { get; private set; }
+    public float Duration { get; }
+    public float Progress => Math.Clamp(Elapsed / Duration, 0f, 1f);
+    public bool IsAlive => Elapsed < Duration;
+
+    public FloatingText(
+        string text,
+        PointF position,
+        Color color,
+        float duration = 1.6f)
+    {
+        Text = text;
+        X = position.X;
+        Y = position.Y;
+        Color = color;
+        Duration = duration;
+    }
+
+    public void Update(float dt)
+    {
+        Elapsed += dt;
+        Y -= 28f * dt;
+    }
+}
+
+// Физический осколок (щепка, камень, земля) с отскоком от рельефа
+public sealed class DebrisParticle
+{
+    public float X { get; private set; }
+    public float Y { get; private set; }
+    public float Vx { get; private set; }
+    public float Vy { get; private set; }
+    public float Size { get; }
+    public float RotationDeg { get; private set; }
+    public float AngularSpeed { get; private set; }
+    public Color Color { get; }
+    public float Elapsed { get; private set; }
+    public float Duration { get; }
+    public float Progress => Math.Clamp(Elapsed / Duration, 0f, 1f);
+    public bool IsAlive => Elapsed < Duration;
+
+    public DebrisParticle(
+        float x,
+        float y,
+        float vx,
+        float vy,
+        float size,
+        float angularSpeed,
+        Color color,
+        float duration = 1.15f)
+    {
+        X = x;
+        Y = y;
+        Vx = vx;
+        Vy = vy;
+        Size = size;
+        AngularSpeed = angularSpeed;
+        Color = color;
+        Duration = duration;
+    }
+
+    public void Update(float dt, float gravity, LevelData level)
+    {
+        Elapsed += dt;
+        Vy += gravity * dt;
+        X += Vx * dt;
+        Y += Vy * dt;
+        RotationDeg += AngularSpeed * dt;
+
+        if (X >= 0f && X < LevelData.WorldWidth)
+        {
+            float ground = level.GetGroundY(X, Y);
+            if (Y + Size * 0.5f < ground) return;
+            Y = ground - Size * 0.5f;
+            Vy = -MathF.Abs(Vy) * 0.36f;
+            Vx *= 0.68f;
+            AngularSpeed *= 0.6f;
+        }
+    }
+}
