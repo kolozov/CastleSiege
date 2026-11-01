@@ -824,7 +824,6 @@ public sealed class GameEngine : IDisposable
                 continue;
             }
 
-            if (block.IsKing) block.TakeDamage(1);
             block.Y = MathF.Min(block.TargetY, block.Y + 260f * dt);
             if (block.Y < block.TargetY - 0.5f)
             {
