@@ -337,6 +337,80 @@ public sealed class LevelData : IDisposable
         }
     }
 
+    // Вырезает круглую воронку в центральной зоне гор в стиле Worms
+    public void CarveCrater(float centerX, float centerY, float radius)
+    {
+        if (radius <= 2f) return;
+        int startX = Math.Max(0,
+            Convert.ToInt32(MathF.Floor(centerX - radius)));
+        int endX = Math.Min(WorldWidth - 1,
+            Convert.ToInt32(MathF.Ceiling(centerX + radius)));
+        if (startX > endX) return;
+
+        int startY = Math.Max(0,
+            Convert.ToInt32(MathF.Floor(centerY - radius)));
+        int endY = Math.Min(DestructibleMaxY,
+            Convert.ToInt32(MathF.Ceiling(centerY + radius)));
+        if (startY > endY) return;
+
+        bool changed = false;
+        float rSq = radius * radius;
+        for (int x = startX; x <= endX; x++)
+        {
+            float dx = x - centerX;
+            float dxSq = dx * dx;
+            for (int y = startY; y <= endY; y++)
+            {
+                float dy = y - centerY;
+                if (dxSq + dy * dy <= rSq)
+                {
+                    if (_solid[x, y])
+                    {
+                        _solid[x, y] = false;
+                        changed = true;
+                    }
+                }
+            }
+        }
+
+        if (!changed) return;
+
+        if (TerrainBitmap.Width >= WorldWidth &&
+            TerrainBitmap.Height >= WorldHeight)
+        {
+            using (var g = Graphics.FromImage(TerrainBitmap))
+            {
+                var clipRect = new Rectangle(0, 0, WorldWidth, WorldHeight);
+
+                g.SetClip(clipRect);
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.CompositingMode = CompositingMode.SourceCopy;
+                using var clearBrush = new SolidBrush(Color.Transparent);
+                g.FillEllipse(
+                    clearBrush,
+                    centerX - radius,
+                    centerY - radius,
+                    radius * 2f,
+                    radius * 2f);
+            }
+        }
+
+        TerrainRevision++;
+
+        for (int x = startX; x <= endX; x++)
+        {
+            TerrainY[x] = GetGroundY(x, 0f);
+        }
+
+        foreach (var slot in CrateSlots)
+        {
+            if (!slot.IsAirborne && slot.ActiveCrate != null)
+            {
+                slot.ActiveCrate.BasePosition = GetCurrentSlotPosition(slot);
+            }
+        }
+    }
+
     public bool IsSolid(int x, int y)
     {
         if (x < 0 || x >= WorldWidth || y < 0 || y >= WorldHeight)

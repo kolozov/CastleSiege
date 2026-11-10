@@ -686,7 +686,7 @@ public sealed class GameEngine : IDisposable
             heavy ? Color.OrangeRed : Color.Gold));
 
         TriggerShake(heavy ? 10f : 5f, heavy ? 0.28f : 0.16f);
-        // Вырезание воронок добавим следующим шагом.
+        Level.CarveCrater(p.X, p.Y, p.ExplosionRadius * 0.85f);
 
         if (directBlock == null)
         {
