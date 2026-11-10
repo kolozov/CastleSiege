@@ -37,6 +37,8 @@ public sealed class GameEngine : IDisposable
     private readonly List<int> _crateRespawnRounds = new List<int>();
 
     private float _shakeTimer;
+    private float _windVx;
+    private void RollWind() => _windVx = _rng.Next(-45, 46);
     private float _shakeDuration;
     private float _shakeIntensity;
 
@@ -463,6 +465,7 @@ public sealed class GameEngine : IDisposable
                 Projectile p = Projectiles[i];
                 if (!p.IsAlive) continue;
 
+                p.Vx += _windVx * subDt;
                 p.Step(subDt, LevelData.Gravity);
                 if (p.X < -30f ||
                     p.X > LevelData.WorldWidth + 30f ||
