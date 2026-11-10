@@ -697,43 +697,31 @@ public sealed class GameEngine : IDisposable
                 190f);
         }
 
-        if (directBlock != null)
+        ExplosionDamageResult dmg = CastlePhysics.ApplyExplosionDamage(
+            Level.Blocks,
+            p.X,
+            p.Y,
+            p.ExplosionRadius,
+            p.DirectDamage,
+            p.SplashDamage,
+            directBlock);
+
+        if (directBlock != null && dmg.ShieldAbsorbedDirectHit)
         {
-            bool wasShielded = directBlock.IsKing && directBlock.HasShield;
-            if (directBlock.TakeDamage(p.DirectDamage))
-            {
-                if (wasShielded)
-                {
-                    FloatingTexts.Add(new FloatingText(
-                        "Щит снят!", directBlock.Center, Color.DeepSkyBlue));
-                    SpawnDebrisBurst(directBlock.Center, 8, Color.Cyan, 200f);
-                }
-                else
-                {
-                    SpawnBlockDebris(directBlock);
-                    if (directBlock.IsKing && directBlock.IsDestroyed)
-                    {
-                        TriggerShake(14f, 0.40f);
-                    }
-                }
-            }
+            FloatingTexts.Add(new FloatingText(
+                "Щит снят!", directBlock.Center, Color.DeepSkyBlue));
+            SpawnDebrisBurst(directBlock.Center, 8, Color.Cyan, 200f);
         }
 
-        float radiusSq = p.ExplosionRadius * p.ExplosionRadius;
-        foreach (var block in Level.Blocks)
+        if (dmg.DirectKingDestroyed)
         {
-            if (block.IsDestroyed || block.IsKing || block == directBlock)
-            {
-                continue;
-            }
+            TriggerShake(14f, 0.40f);
+        }
 
-            float dx = block.Center.X - p.X;
-            float dy = block.Center.Y - p.Y;
-            if (dx * dx + dy * dy <= radiusSq &&
-                block.TakeDamage(p.SplashDamage))
-            {
-                SpawnBlockDebris(block);
-            }
+        foreach (var block in dmg.DamagedBlocks)
+        {
+            if (dmg.ShieldAbsorbedDirectHit && block == directBlock) continue;
+            SpawnBlockDebris(block);
         }
     }
 
@@ -785,57 +773,15 @@ public sealed class GameEngine : IDisposable
         }
     }
 
-    private bool UpdateBlockTargets()
-    {
-        bool anyWillFall = false;
-        foreach (var side in new PlayerId[] { PlayerId.Blue, PlayerId.Red })
-        {
-            for (int col = 0; col < LevelData.GridCols; col++)
-            {
-                var colBlocks = new List<Block>();
-                foreach (var b in Level.Blocks)
-                {
-                    if (!b.IsDestroyed && b.Owner == side && b.ColumnIndex == col)
-                    {
-                        colBlocks.Add(b);
-                    }
-                }
-
-                colBlocks.Sort((a, b) => b.Y.CompareTo(a.Y));
-                float floorY = LevelData.BaseGroundY;
-                foreach (var b in colBlocks)
-                {
-                    b.TargetY = floorY - b.Height;
-                    if (b.TargetY - b.Y > 0.5f) anyWillFall = true;
-                    floorY = b.TargetY;
-                }
-            }
-        }
-        return anyWillFall;
-    }
+    private bool UpdateBlockTargets() =>
+        CastlePhysics.ComputeDropTargets(Level.Blocks);
 
     private void UpdateSettling(float dt)
     {
-        bool stillMoving = false;
-        foreach (var block in Level.Blocks)
+        if (!CastlePhysics.StepSettling(Level.Blocks, dt))
         {
-            if (block.IsDestroyed || block.Y >= block.TargetY - 0.5f)
-            {
-                continue;
-            }
-
-            block.Y = MathF.Min(block.TargetY, block.Y + 260f * dt);
-            if (block.Y < block.TargetY - 0.5f)
-            {
-                stillMoving = true;
-            }
-            else
-            {
-                block.Y = block.TargetY;
-            }
+            FinishTurnResolution();
         }
-
-        if (!stillMoving) FinishTurnResolution();
     }
 
     private void FinishTurnResolution()
