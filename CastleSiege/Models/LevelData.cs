@@ -341,9 +341,9 @@ public sealed class LevelData : IDisposable
     public void CarveCrater(float centerX, float centerY, float radius)
     {
         if (radius <= 2f) return;
-        int startX = Math.Max(0,
+        int startX = Math.Max(DestructibleMinX,
             Convert.ToInt32(MathF.Floor(centerX - radius)));
-        int endX = Math.Min(WorldWidth - 1,
+        int endX = Math.Min(DestructibleMaxX,
             Convert.ToInt32(MathF.Ceiling(centerX + radius)));
         if (startX > endX) return;
 
@@ -380,7 +380,11 @@ public sealed class LevelData : IDisposable
         {
             using (var g = Graphics.FromImage(TerrainBitmap))
             {
-                var clipRect = new Rectangle(0, 0, WorldWidth, WorldHeight);
+                var clipRect = new Rectangle(
+                    DestructibleMinX,
+                    0,
+                    DestructibleMaxX - DestructibleMinX + 1,
+                    DestructibleMaxY + 1);
 
                 g.SetClip(clipRect);
                 g.SmoothingMode = SmoothingMode.AntiAlias;
