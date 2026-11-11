@@ -4,6 +4,7 @@ using System.Windows.Forms;
 using CastleSiege.Audio;
 using CastleSiege.Engine;
 using CastleSiege.Models;
+using CastleSiege.Rendering;
 
 namespace CastleSiege;
 
@@ -83,6 +84,7 @@ public sealed class MainForm : Form
         LocationId.Fortress
     };
 
+    private readonly GameRenderer _renderer = new GameRenderer();
     private readonly GameEngine _engine;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
 
@@ -561,27 +563,7 @@ public sealed class MainForm : Form
             float scaleX = 1f * _canvas.Width / LevelData.WorldWidth;
             float scaleY = 1f * _canvas.Height / LevelData.WorldHeight;
             e.Graphics.ScaleTransform(scaleX, scaleY);
-            e.Graphics.Clear(Color.SkyBlue);
-            using var ground = new SolidBrush(Color.FromArgb(88, 128, 62));
-            e.Graphics.FillRectangle(
-                ground, 0, LevelData.BaseGroundY, LevelData.WorldWidth, 180);
-            foreach (var b in _engine.Level.Blocks)
-            {
-                if (!b.IsDestroyed)
-                    e.Graphics.FillRectangle(
-                        b.Owner == PlayerId.Blue ? Brushes.RoyalBlue : Brushes.Crimson,
-                        b.Bounds);
-            }
-            foreach (var p in _engine.Projectiles)
-            {
-                if (p.IsAlive)
-                    e.Graphics.FillEllipse(
-                        Brushes.Black,
-                        p.X - p.Radius,
-                        p.Y - p.Radius,
-                        p.Radius * 2f,
-                        p.Radius * 2f);
-            }
+            _renderer.Render(e.Graphics, _engine);
         };
 
         _canvas.MouseDown += OnCanvasMouseDown;
@@ -994,6 +976,7 @@ public sealed class MainForm : Form
         _frameTimer.Dispose();
         _engine.Dispose();
         base.Dispose(disposing);
+        _renderer.Dispose();
         foreach (var font in _fonts.Values) font.Dispose();
     }
 }
