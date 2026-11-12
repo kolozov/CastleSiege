@@ -84,6 +84,7 @@ public sealed class MainForm : Form
         LocationId.Fortress
     };
 
+    private readonly SoundManager _sound = new SoundManager();
     private readonly GameRenderer _renderer = new GameRenderer();
     private readonly GameEngine _engine;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
@@ -187,7 +188,7 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
-        _engine = new GameEngine();
+        _engine = new GameEngine(_sound);
         SuspendLayout();
         AutoScaleDimensions = new SizeF(96f, 96f);
         AutoScaleMode = AutoScaleMode.Dpi;
@@ -201,6 +202,7 @@ public sealed class MainForm : Form
         BindEvents();
         _engine.OpenBuilder();
         SyncScreenVisibility();
+        RefreshAudioUi();
         RefreshAllUi();
         ResumeLayout(true);
 
@@ -473,6 +475,7 @@ public sealed class MainForm : Form
         {
             if (_engine.TrySelectProjectile(ProjectileType.Standard))
             {
+                _sound.PlayUiClick();
             }
             RefreshAllUi();
             _canvas.Focus();
@@ -482,6 +485,7 @@ public sealed class MainForm : Form
         {
             if (_engine.TrySelectProjectile(ProjectileType.Cluster))
             {
+                _sound.PlayUiClick();
             }
             RefreshAllUi();
             _canvas.Focus();
@@ -491,6 +495,7 @@ public sealed class MainForm : Form
         {
             if (_engine.TrySelectProjectile(ProjectileType.Ricochet))
             {
+                _sound.PlayUiClick();
             }
             RefreshAllUi();
             _canvas.Focus();
@@ -498,6 +503,7 @@ public sealed class MainForm : Form
 
         _btnBattleSettings.Click += (_, _) =>
         {
+            _sound.PlayUiClick();
             _battleSettingsPanel.Visible = !_battleSettingsPanel.Visible;
             if (_battleSettingsPanel.Visible)
             {
@@ -521,6 +527,7 @@ public sealed class MainForm : Form
             LocationId location = Locations[_cmbLocation.SelectedIndex];
             if (_engine.Builder.SelectedLocation == location) return;
 
+            _sound.PlayUiClick();
             _engine.PreviewBuilderLocation(location);
             RefreshAllUi();
         };
@@ -532,12 +539,18 @@ public sealed class MainForm : Form
 
         EventHandler toggleMusic = (_, _) =>
         {
-                _canvas.Focus();
+            _sound.PlayUiClick();
+            _sound.ToggleMusic();
+            RefreshAudioUi();
+            _canvas.Focus();
         };
 
         EventHandler toggleSound = (_, _) =>
         {
-                _canvas.Focus();
+            _sound.ToggleSoundEffects();
+            if (_sound.SoundEffectsEnabled) _sound.PlayUiClick();
+            RefreshAudioUi();
+            _canvas.Focus();
         };
 
         foreach (var b in new[]
@@ -589,12 +602,14 @@ public sealed class MainForm : Form
 
     private void SelectBrush(BlockType brush)
     {
+        _sound.PlayUiClick();
         _engine.Builder.SelectedBrush = brush;
         RefreshAllUi();
     }
 
     private void OpenMenu()
     {
+        _sound.PlayUiClick();
         _engine.OpenMainMenu();
         _engine.OpenBuilder();
         SyncScreenVisibility();
@@ -603,6 +618,7 @@ public sealed class MainForm : Form
 
     private void OpenBuilder()
     {
+        _sound.PlayUiClick();
         _engine.OpenBuilder();
         _engine.OpenBuilder();
         SyncScreenVisibility();
@@ -611,6 +627,7 @@ public sealed class MainForm : Form
 
     private void StartBattle()
     {
+        _sound.PlayUiClick();
         _engine.StartBattleFromBuilder();
         _engine.OpenBuilder();
         SyncScreenVisibility();
@@ -634,6 +651,7 @@ public sealed class MainForm : Form
 
         if (unusedWarning != null)
         {
+            _sound.PlayUiClick();
             DialogResult res = MessageBox.Show(
                 this,
                 unusedWarning,
@@ -656,6 +674,7 @@ public sealed class MainForm : Form
 
         if (keyData == Keys.Escape && inBattle)
         {
+            _sound.PlayUiClick();
             _battleSettingsPanel.Visible = !_battleSettingsPanel.Visible;
             if (_battleSettingsPanel.Visible)
             {
@@ -706,6 +725,7 @@ public sealed class MainForm : Form
             prevRicochet != curRicochet;
 
         if (stateChanged) RefreshAllUi();
+        if (_musicAvailable != _sound.MusicAvailable) RefreshAudioUi();
         _canvas.Invalidate(false);
     }
 
@@ -730,6 +750,7 @@ public sealed class MainForm : Form
             }
             else
             {
+                _sound.PlayError();
             }
             return;
         }
@@ -737,6 +758,7 @@ public sealed class MainForm : Form
         if (_engine.Phase == GamePhase.MainMenu
             || e.Button != MouseButtons.Left)
         {
+            _sound.PlayError();
             return;
         }
 
@@ -828,9 +850,9 @@ public sealed class MainForm : Form
 
     private void RefreshAudioUi()
     {
-        _musicAvailable = false;
-        bool musicEnabled = false;
-        bool soundEnabled = true;
+        _musicAvailable = _sound.MusicAvailable;
+        bool musicEnabled = _sound.MusicEnabled;
+        bool soundEnabled = _sound.SoundEffectsEnabled;
         Color audioOn = Color.FromArgb(32, 111, 98);
 
         foreach (var button in new[]
@@ -974,6 +996,7 @@ public sealed class MainForm : Form
         _disposed = true;
         _frameTimer.Stop();
         _frameTimer.Dispose();
+        _sound.Dispose();
         _engine.Dispose();
         base.Dispose(disposing);
         _renderer.Dispose();

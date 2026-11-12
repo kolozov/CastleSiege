@@ -1,4 +1,5 @@
 using System.Drawing;
+using CastleSiege.Audio;
 using CastleSiege.Models;
 
 namespace CastleSiege.Engine;
@@ -26,6 +27,7 @@ public sealed class GameEngine : IDisposable
     private const int CrateRespawnRounds = 3;
 
     private readonly Random _rng = new Random();
+    private readonly SoundManager _sound;
 
     private readonly Dictionary<PlayerId, Dictionary<ProjectileType, int>>
         _ammo = new();
@@ -76,8 +78,11 @@ public sealed class GameEngine : IDisposable
             ? Level.BlueCatapult
             : Level.RedCatapult;
 
-    public GameEngine()
+    public GameEngine() : this(new SoundManager()) { }
+
+    public GameEngine(SoundManager sound)
     {
+        _sound = sound;
         StartNewGame(LocationId.Plains);
         Phase = GamePhase.MainMenu;
         StatusMessage = "Добро пожаловать в «Осаду замка»!";
@@ -212,6 +217,7 @@ public sealed class GameEngine : IDisposable
     {
         if (Phase == GamePhase.GameOver)
         {
+            _sound.PlayError();
             return false;
         }
 
@@ -299,6 +305,7 @@ public sealed class GameEngine : IDisposable
         Projectiles.Clear();
         Projectiles.Add(proj);
         Phase = GamePhase.Flying;
+        _sound.PlayShoot();
 
         StatusMessage = chosen == ProjectileType.Cluster
             ? "Кассетный снаряд в воздухе! Клик или Пробел — разделить."
@@ -347,6 +354,7 @@ public sealed class GameEngine : IDisposable
         if (Builder.TryChangeBudget(type, delta, out string message))
         {
             StatusMessage = message;
+            _sound.PlayPlaceBlock();
         }
         else
         {
@@ -358,18 +366,21 @@ public sealed class GameEngine : IDisposable
     {
         Builder.LoadLocationPreset(Builder.SelectedLocation);
         StatusMessage = $"Загружен шаблон «{Level.Title}».";
+        _sound.PlayPlaceBlock();
     }
 
     public void AutoFillBuilder()
     {
         Builder.AutoFillFromCurrentBudget();
         StatusMessage = "Оба замка расставлены по текущему бюджету.";
+        _sound.PlayPlaceBlock();
     }
 
     public void ClearBuilder()
     {
         Builder.ClearGrids();
         StatusMessage = "Обе сетки очищены. Блоки возвращены в запас.";
+        _sound.PlayRemoveBlock();
     }
 
     public void HandleBuilderClick(PointF worldPt, bool isRightClick)
@@ -392,6 +403,8 @@ public sealed class GameEngine : IDisposable
         if (ok)
         {
             StatusMessage = msg;
+            if (isRightClick) _sound.PlayRemoveBlock();
+            else _sound.PlayPlaceBlock();
         }
         else
         {
@@ -679,6 +692,7 @@ public sealed class GameEngine : IDisposable
     private void ExplodeProjectile(Projectile p, Block? directBlock)
     {
         bool heavy = p is RicochetProjectile;
+        _sound.PlayExplosion(heavy);
 
         Explosions.Add(new ExplosionEffect(
             new PointF(p.X, p.Y),
@@ -806,6 +820,7 @@ public sealed class GameEngine : IDisposable
             Phase = GamePhase.GameOver;
             IsDraw = true;
             StatusMessage = "Ничья! Оба Короля пали в одном ходу!";
+            _sound.PlayVictory();
             return;
         }
 
@@ -831,6 +846,7 @@ public sealed class GameEngine : IDisposable
                     : "Победа Красного замка!";
             }
 
+            _sound.PlayVictory();
             return;
         }
 
@@ -895,6 +911,7 @@ public sealed class GameEngine : IDisposable
     private bool RejectAction(string message)
     {
         StatusMessage = message;
+        _sound.PlayError();
         return false;
     }
 
