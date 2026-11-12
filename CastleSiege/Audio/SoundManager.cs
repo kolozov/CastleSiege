@@ -13,6 +13,7 @@ public sealed class SoundManager : IDisposable
     private bool _musicEnabled;
     private bool _disposed;
     private SoundPlayer? _activeEffect;
+    private SoundPlayer? _musicLoopPlayer;
 
     public bool SoundEffectsEnabled { get; private set; } = true;
     public bool MusicAvailable => true;
@@ -66,7 +67,12 @@ public sealed class SoundManager : IDisposable
 
     }
 
-    public void ToggleMusic() { }
+    public void ToggleMusic()
+    {
+        _musicEnabled = !_musicEnabled;
+        if (_musicEnabled) _musicLoopPlayer?.PlayLooping();
+        else _musicLoopPlayer?.Stop();
+    }
     public void ToggleSoundEffects()
     {
         SoundEffectsEnabled = !SoundEffectsEnabled;
