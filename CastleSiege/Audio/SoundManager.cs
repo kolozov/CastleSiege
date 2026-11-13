@@ -1,4 +1,5 @@
 using System.Media;
+using System.Runtime.InteropServices;
 
 namespace CastleSiege.Audio;
 
@@ -10,18 +11,38 @@ public sealed class SoundManager : IDisposable
     private readonly Dictionary<string, SoundPlayer> _effects =
         new Dictionary<string, SoundPlayer>();
 
+    private readonly System.Threading.Timer _musicTimer;
+    private readonly object _midiLock = new object();
+
+    private readonly int[] _melodyNotes = new int[]
+    {
+        64, 67, 71, 69, 67, 64, 62, 64,
+        67, 71, 74, 72, 71, 69, 67, 62
+    };
+
+    private nint _midiHandle;
+    private int _melodyStep;
+    private int _lastMidiNote = -1;
     private bool _musicEnabled;
     private bool _disposed;
+    private volatile bool _musicAvailable;
     private SoundPlayer? _activeEffect;
-    private SoundPlayer? _musicLoopPlayer;
 
     public bool SoundEffectsEnabled { get; private set; } = true;
-    public bool MusicAvailable => true;
-    public bool MusicEnabled => _musicEnabled;
+    public bool MusicAvailable => _musicAvailable;
+
+    public bool MusicEnabled
+    {
+        get
+        {
+            lock (_midiLock) return _musicEnabled;
+        }
+    }
 
     public SoundManager()
     {
         var rng = new Random(42);
+
         _effects["shoot"] = CreatePlayer(
             GenerateTone(new float[] { 220f }, 80f, 0.14f, 0.45f));
 
@@ -65,14 +86,60 @@ public sealed class SoundManager : IDisposable
         _effects["explosion_heavy"] = CreatePlayer(
             GenerateExplosion(0.42f, 0.6f, rng));
 
+        _musicTimer = new System.Threading.Timer(
+            OnMusicTick, null, Timeout.Infinite, Timeout.Infinite);
+
+        try
+        {
+            if (midiOutOpen(out _midiHandle, -1, 0, 0, 0) == 0)
+            {
+                if (midiOutShortMsg(_midiHandle, 0x000050C0) == 0)
+                {
+                    _musicEnabled = true;
+                    _musicAvailable = true;
+                    _musicTimer.Change(240, 240);
+                }
+                else
+                {
+                    CloseMidiLocked();
+                }
+            }
+            else
+            {
+                _midiHandle = 0;
+            }
+        }
+        catch
+        {
+            CloseMidiLocked();
+        }
     }
 
     public void ToggleMusic()
     {
-        _musicEnabled = !_musicEnabled;
-        if (_musicEnabled) _musicLoopPlayer?.PlayLooping();
-        else _musicLoopPlayer?.Stop();
+        lock (_midiLock)
+        {
+            if (!_musicAvailable || _disposed) return;
+            _musicEnabled = !_musicEnabled;
+            if (_musicEnabled)
+            {
+                _musicTimer.Change(240, 240);
+            }
+            else
+            {
+                _musicTimer.Change(Timeout.Infinite, Timeout.Infinite);
+                try
+                {
+                    if (!StopCurrentMidiNoteLocked()) CloseMidiLocked();
+                }
+                catch
+                {
+                    CloseMidiLocked();
+                }
+            }
+        }
     }
+
     public void ToggleSoundEffects()
     {
         SoundEffectsEnabled = !SoundEffectsEnabled;
@@ -207,10 +274,65 @@ public sealed class SoundManager : IDisposable
         return ms.ToArray();
     }
 
+    private void OnMusicTick(object? state)
+    {
+        lock (_midiLock)
+        {
+            if (_disposed || _midiHandle == 0 || !_musicEnabled) return;
+            try
+            {
+                int note = _melodyNotes[_melodyStep];
+                uint msg = 0x90u |
+                           (Convert.ToUInt32(note) << 8) |
+                           (46u << 16);
+
+                if (!StopCurrentMidiNoteLocked() ||
+                    midiOutShortMsg(_midiHandle, msg) != 0)
+                {
+                    CloseMidiLocked();
+                    return;
+                }
+                _melodyStep = (_melodyStep + 1) % _melodyNotes.Length;
+                _lastMidiNote = note;
+            }
+            catch
+            {
+                CloseMidiLocked();
+            }
+        }
+    }
+
+    private bool StopCurrentMidiNoteLocked()
+    {
+        if (_lastMidiNote < 0) return true;
+        uint msg = 0x80u | (Convert.ToUInt32(_lastMidiNote) << 8);
+        if (midiOutShortMsg(_midiHandle, msg) != 0) return false;
+        _lastMidiNote = -1;
+        return true;
+    }
+
+    private void CloseMidiLocked()
+    {
+        _musicAvailable = false;
+        _musicEnabled = false;
+        _musicTimer.Change(Timeout.Infinite, Timeout.Infinite);
+        if (_midiHandle == 0) return;
+
+        try { midiOutReset(_midiHandle); } catch { }
+        try { midiOutClose(_midiHandle); } catch { }
+        _midiHandle = 0;
+        _lastMidiNote = -1;
+    }
+
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
+        lock (_midiLock)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            CloseMidiLocked();
+            _musicTimer.Dispose();
+        }
         StopEffect();
         foreach (var player in _effects.Values)
         {
@@ -221,4 +343,20 @@ public sealed class SoundManager : IDisposable
         _effects.Clear();
     }
 
+    [DllImport("winmm.dll")]
+    private static extern int midiOutOpen(
+        out nint lphMidiOut,
+        int uDeviceID,
+        nint dwCallback,
+        nint dwInstance,
+        int dwFlags);
+
+    [DllImport("winmm.dll")]
+    private static extern int midiOutShortMsg(nint hMidiOut, uint dwMsg);
+
+    [DllImport("winmm.dll")]
+    private static extern int midiOutReset(nint hMidiOut);
+
+    [DllImport("winmm.dll")]
+    private static extern int midiOutClose(nint hMidiOut);
 }
