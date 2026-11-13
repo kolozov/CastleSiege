@@ -468,8 +468,8 @@ public sealed class GameEngine : IDisposable
 
     private void UpdateProjectiles(float dt)
     {
-        float subDt = dt;
-        for (int step = 0; step < 1; step++)
+        float subDt = dt / 6f;
+        for (int step = 0; step < 6; step++)
         {
             for (int i = 0; i < Projectiles.Count; i++)
             {
