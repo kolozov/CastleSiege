@@ -299,8 +299,18 @@ public sealed class GameEngine : IDisposable
         float sx = CurrentCatapultAnchor.X;
         float sy = CurrentCatapultAnchor.Y - 6f;
 
-        Projectile proj = new StandardProjectile(
-            CurrentPlayer, sx, sy, lp.Vx, lp.Vy);
+        Projectile proj = chosen switch
+        {
+            ProjectileType.Cluster =>
+                new ClusterProjectile(
+                    CurrentPlayer, sx, sy, lp.Vx, lp.Vy),
+            ProjectileType.Ricochet =>
+                new RicochetProjectile(
+                    CurrentPlayer, sx, sy, lp.Vx, lp.Vy),
+            _ =>
+                new StandardProjectile(
+                    CurrentPlayer, sx, sy, lp.Vx, lp.Vy)
+        };
 
         Projectiles.Clear();
         Projectiles.Add(proj);
@@ -315,6 +325,38 @@ public sealed class GameEngine : IDisposable
     }
 
     // Разделяет активный кассетный снаряд в полёте
+    public bool TrySplitCluster()
+    {
+        if (Phase != GamePhase.Flying) return false;
+
+        for (int i = 0; i < Projectiles.Count; i++)
+        {
+            var p = Projectiles[i];
+            if (p is not ClusterProjectile || !p.IsAlive) continue;
+
+            if (!p.TrySplit(out var children))
+            {
+                return RejectAction(
+                    "Кассета только вылетела. Попробуйте чуть позже.");
+            }
+
+            Projectiles.AddRange(children);
+            Explosions.Add(new ExplosionEffect(
+                new PointF(p.X, p.Y),
+                22f,
+                Color.MediumPurple,
+                0.22f));
+
+            _sound.PlaySplit();
+            StatusMessage = "Кассета раскрылась!";
+            return true;
+        }
+
+        return RejectAction(
+            "Сейчас в полёте нет кассеты, которую можно разделить.");
+    }
+
+    public LaunchParams ComputeLaunchParams(PointF dragPoint)
     {
         PointF anchor = CurrentCatapultAnchor;
         float dx = anchor.X - dragPoint.X;
@@ -680,11 +722,28 @@ public sealed class GameEngine : IDisposable
         Block? hitBlock,
         Color sparkColor)
     {
+        bool leavingSurface = p is RicochetProjectile &&
+            p.Vx * nx + p.Vy * ny > 0f;
+
+        if (leavingSurface || !p.OnSurfaceHit(nx, ny))
+        {
+            p.X = x + nx * (p.Radius + 0.5f);
+            p.Y = y + ny * (p.Radius + 0.5f);
+            if (!leavingSurface)
+            {
+                _sound.PlayRicochet();
+                Explosions.Add(new ExplosionEffect(
+                    new PointF(x, y), 16f, sparkColor, 0.18f));
+            }
+            return;
+        }
+
         if (hitBlock == null)
         {
             p.X = x;
             p.Y = y;
         }
+
         ExplodeProjectile(p, hitBlock);
         p.IsAlive = false;
     }

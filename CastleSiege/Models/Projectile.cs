@@ -78,3 +78,82 @@ public sealed class StandardProjectile : Projectile
         : base(owner, ProjectileType.Standard, x, y, vx, vy, 7.5f) { }
 }
 
+// Кассетный снаряд: разделяется на 3 мини-ядра
+public sealed class ClusterProjectile : Projectile
+{
+    public bool HasSplit { get; private set; }
+    public override bool CanSplit =>
+        !HasSplit && IsAlive && AgeSeconds >= 0.08f;
+
+    public ClusterProjectile(
+        PlayerId owner,
+        float x, float y,
+        float vx, float vy)
+        : base(owner, ProjectileType.Cluster, x, y, vx, vy, 8.5f) { }
+
+    public override bool TrySplit(out List<Projectile> children)
+    {
+        if (!CanSplit)
+        {
+            children = new List<Projectile>();
+            return false;
+        }
+
+        HasSplit = true;
+        IsAlive = false;
+        float[] angles = new float[] { 0f, -0.24f, 0.24f };
+        float[] scales = new float[] { 1.02f, 0.96f, 0.96f };
+        children = new List<Projectile>(3);
+
+        for (int i = 0; i < angles.Length; i++)
+        {
+            float c = MathF.Cos(angles[i]);
+            float s = MathF.Sin(angles[i]);
+            float childVx = (Vx * c - Vy * s) * scales[i];
+            float childVy = (Vx * s + Vy * c) * scales[i];
+            children.Add(new ClusterChildProjectile(
+                Owner, X, Y, childVx, childVy));
+        }
+        return true;
+    }
+}
+
+// Осколок кассетного снаряда
+public sealed class ClusterChildProjectile : Projectile
+{
+    public override float ExplosionRadius => 18f;
+
+    public ClusterChildProjectile(
+        PlayerId owner,
+        float x, float y,
+        float vx, float vy)
+        : base(owner, ProjectileType.Cluster, x, y, vx, vy, 5.5f) { }
+}
+
+// Бомба с рикошетом: 2 отскока без взрыва, взрыв на 3-е касание
+public sealed class RicochetProjectile : Projectile
+{
+    public int BouncesRemaining { get; private set; } = 2;
+    public override int DirectDamage => 2;
+    public override int SplashDamage => 2;
+    public override float ExplosionRadius => 42f;
+
+    public RicochetProjectile(
+        PlayerId owner,
+        float x, float y,
+        float vx, float vy)
+        : base(owner, ProjectileType.Ricochet, x, y, vx, vy, 8.5f) { }
+
+    public override bool OnSurfaceHit(float nx, float ny)
+    {
+        if (BouncesRemaining <= 0) return true;
+        float dot = Vx * nx + Vy * ny;
+        if (dot < 0f)
+        {
+            Vx = (Vx - 2f * dot * nx) * 0.78f;
+            Vy = (Vy - 2f * dot * ny) * 0.78f;
+        }
+        BouncesRemaining--;
+        return false;
+    }
+}
