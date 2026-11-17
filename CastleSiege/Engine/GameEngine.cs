@@ -299,9 +299,18 @@ public sealed class GameEngine : IDisposable
         float sx = CurrentCatapultAnchor.X;
         float sy = CurrentCatapultAnchor.Y - 6f;
 
-        Projectile proj = chosen == ProjectileType.Cluster
-            ? new ClusterProjectile(CurrentPlayer, sx, sy, lp.Vx, lp.Vy)
-            : new StandardProjectile(CurrentPlayer, sx, sy, lp.Vx, lp.Vy);
+        Projectile proj = chosen switch
+        {
+            ProjectileType.Cluster =>
+                new ClusterProjectile(
+                    CurrentPlayer, sx, sy, lp.Vx, lp.Vy),
+            ProjectileType.Ricochet =>
+                new RicochetProjectile(
+                    CurrentPlayer, sx, sy, lp.Vx, lp.Vy),
+            _ =>
+                new StandardProjectile(
+                    CurrentPlayer, sx, sy, lp.Vx, lp.Vy)
+        };
 
         Projectiles.Clear();
         Projectiles.Add(proj);
@@ -713,11 +722,22 @@ public sealed class GameEngine : IDisposable
         Block? hitBlock,
         Color sparkColor)
     {
+        if (!p.OnSurfaceHit(nx, ny))
+        {
+            p.X = x + nx * (p.Radius + 0.5f);
+            p.Y = y + ny * (p.Radius + 0.5f);
+            _sound.PlayRicochet();
+            Explosions.Add(new ExplosionEffect(
+                new PointF(x, y), 16f, sparkColor, 0.18f));
+            return;
+        }
+
         if (hitBlock == null)
         {
             p.X = x;
             p.Y = y;
         }
+
         ExplodeProjectile(p, hitBlock);
         p.IsAlive = false;
     }

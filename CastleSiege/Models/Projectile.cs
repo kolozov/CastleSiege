@@ -130,3 +130,30 @@ public sealed class ClusterChildProjectile : Projectile
         : base(owner, ProjectileType.Cluster, x, y, vx, vy, 5.5f) { }
 }
 
+// Бомба с рикошетом: 2 отскока без взрыва, взрыв на 3-е касание
+public sealed class RicochetProjectile : Projectile
+{
+    public int BouncesRemaining { get; private set; } = 2;
+    public override int DirectDamage => 2;
+    public override int SplashDamage => 2;
+    public override float ExplosionRadius => 42f;
+
+    public RicochetProjectile(
+        PlayerId owner,
+        float x, float y,
+        float vx, float vy)
+        : base(owner, ProjectileType.Ricochet, x, y, vx, vy, 8.5f) { }
+
+    public override bool OnSurfaceHit(float nx, float ny)
+    {
+        if (BouncesRemaining <= 0) return true;
+        float dot = Vx * nx + Vy * ny;
+        if (dot < 0f)
+        {
+            Vx = (Vx - 2f * dot * nx) * 0.78f;
+            Vy = (Vy - 2f * dot * ny) * 0.78f;
+        }
+        BouncesRemaining--;
+        return false;
+    }
+}
