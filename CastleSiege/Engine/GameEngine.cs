@@ -722,13 +722,19 @@ public sealed class GameEngine : IDisposable
         Block? hitBlock,
         Color sparkColor)
     {
-        if (!p.OnSurfaceHit(nx, ny))
+        bool leavingSurface = p is RicochetProjectile &&
+            p.Vx * nx + p.Vy * ny > 0f;
+
+        if (leavingSurface || !p.OnSurfaceHit(nx, ny))
         {
             p.X = x + nx * (p.Radius + 0.5f);
             p.Y = y + ny * (p.Radius + 0.5f);
-            _sound.PlayRicochet();
-            Explosions.Add(new ExplosionEffect(
-                new PointF(x, y), 16f, sparkColor, 0.18f));
+            if (!leavingSurface)
+            {
+                _sound.PlayRicochet();
+                Explosions.Add(new ExplosionEffect(
+                    new PointF(x, y), 16f, sparkColor, 0.18f));
+            }
             return;
         }
 
