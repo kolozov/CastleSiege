@@ -527,7 +527,7 @@ public sealed class GameEngine : IDisposable
                     continue;
                 }
 
-                if (!CheckBlockCollision(p))
+                if (!CheckCrateCollision(p) && !CheckBlockCollision(p))
                 {
                     CheckTerrainCollision(p);
                 }
@@ -545,6 +545,21 @@ public sealed class GameEngine : IDisposable
             if (UpdateBlockTargets()) Phase = GamePhase.Settling;
             else FinishTurnResolution();
         }
+    }
+
+    private bool CheckCrateCollision(Projectile p)
+    {
+        foreach (var slot in Level.CrateSlots)
+        {
+            if (slot.ActiveCrate == null) continue;
+            if (TouchesRectangle(p, slot.ActiveCrate.Bounds, out _, out _))
+            {
+                CollectCrate(slot, p.Owner);
+                p.IsAlive = false;
+                return true;
+            }
+        }
+        return false;
     }
 
     private bool CheckBlockCollision(Projectile p)
@@ -844,6 +859,42 @@ public sealed class GameEngine : IDisposable
                 (_rng.NextSingle() * 2f - 1f) * 360f,
                 color));
         }
+    }
+
+    private void CollectCrate(CrateSlot slot, PlayerId collector)
+    {
+        PointF pos = slot.ActiveCrate != null
+            ? slot.ActiveCrate.CurrentPosition
+            : slot.Position;
+
+        slot.ActiveCrate = null;
+        _crateRespawnRounds.Add(RoundNumber + CrateRespawnRounds + 1);
+        SpawnDebrisBurst(pos, 7, Color.FromArgb(218, 165, 84), 190f);
+
+        PlayerId opponent = collector == PlayerId.Blue
+            ? PlayerId.Red
+            : PlayerId.Blue;
+
+        CrateEffectType[] effects = Enum.GetValues<CrateEffectType>();
+        CrateEffectType effect = effects[_rng.Next(effects.Length)];
+
+        GrantRandomAmmo(collector, pos);
+    }
+
+    private void GrantRandomAmmo(PlayerId player, PointF pos)
+    {
+        ProjectileType bonus = _rng.Next(2) == 0
+            ? ProjectileType.Cluster
+            : ProjectileType.Ricochet;
+
+        _ammo[player][bonus]++;
+        FloatingTexts.Add(new FloatingText(
+            bonus == ProjectileType.Cluster
+                ? "+1 Кассета!"
+                : "+1 Рикошет!",
+            pos,
+            Color.Gold));
+        _sound.PlayCrateBonus();
     }
 
     private bool UpdateBlockTargets() =>
