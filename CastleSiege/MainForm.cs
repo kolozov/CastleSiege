@@ -182,6 +182,7 @@ public sealed class MainForm : Form
     private readonly ComboBox _cmbLocation = new ComboBox();
 
     private double _lastFrameSeconds;
+    private int _turnSecondsLeft = 30;
     private int _aimGesture;
     private bool _musicAvailable;
     private bool _disposed;
@@ -727,6 +728,16 @@ public sealed class MainForm : Form
         if (stateChanged) RefreshAllUi();
         if (_musicAvailable != _sound.MusicAvailable) RefreshAudioUi();
         _canvas.Invalidate(false);
+    }
+
+    private void OnTurnSecondTick(object? sender, EventArgs e)
+    {
+        if (_engine.Phase != GamePhase.Aiming) return;
+        _turnSecondsLeft--;
+        if (_turnSecondsLeft <= 0)
+        {
+            _turnSecondsLeft = 30;
+        }
     }
 
     private void OnCanvasMouseDown(object? sender, MouseEventArgs e)
