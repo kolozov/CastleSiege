@@ -878,7 +878,60 @@ public sealed class GameEngine : IDisposable
         CrateEffectType[] effects = Enum.GetValues<CrateEffectType>();
         CrateEffectType effect = effects[_rng.Next(effects.Length)];
 
-        GrantRandomAmmo(collector, pos);
+        if (effect == CrateEffectType.KingShield)
+        {
+            Block? king = null;
+            foreach (var b in Level.Blocks)
+            {
+                if (b.Owner == collector && b.IsKing && !b.IsDestroyed)
+                {
+                    king = b;
+                    break;
+                }
+            }
+
+            if (king != null && !king.HasShield)
+            {
+                king.HasShield = true;
+                FloatingTexts.Add(new FloatingText(
+                    "+1 Щит Короля!", pos, Color.DeepSkyBlue));
+                _sound.PlayCrateBonus();
+            }
+            else
+            {
+                GrantRandomAmmo(collector, pos);
+            }
+        }
+        else if (effect == CrateEffectType.RepairCastle)
+        {
+            int repaired = 0;
+            foreach (var block in Level.Blocks)
+            {
+                if (block.Owner == collector && block.RepairOneHp())
+                {
+                    repaired++;
+                }
+            }
+
+            if (repaired > 0)
+            {
+                FloatingTexts.Add(new FloatingText(
+                    $"Ремонт (+{repaired} бл.)", pos, Color.LimeGreen));
+                _sound.PlayCrateBonus();
+            }
+            else
+            {
+                GrantRandomAmmo(collector, pos);
+            }
+        }
+        else if (effect == CrateEffectType.ExtraAmmo)
+        {
+            GrantRandomAmmo(collector, pos);
+        }
+        else
+        {
+            GrantRandomAmmo(collector, pos);
+        }
     }
 
     private void GrantRandomAmmo(PlayerId player, PointF pos)
