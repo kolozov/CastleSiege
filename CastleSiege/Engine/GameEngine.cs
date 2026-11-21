@@ -527,7 +527,7 @@ public sealed class GameEngine : IDisposable
                     continue;
                 }
 
-                if (!CheckBlockCollision(p))
+                if (!CheckCrateCollision(p) && !CheckBlockCollision(p))
                 {
                     CheckTerrainCollision(p);
                 }
@@ -545,6 +545,21 @@ public sealed class GameEngine : IDisposable
             if (UpdateBlockTargets()) Phase = GamePhase.Settling;
             else FinishTurnResolution();
         }
+    }
+
+    private bool CheckCrateCollision(Projectile p)
+    {
+        foreach (var slot in Level.CrateSlots)
+        {
+            if (slot.ActiveCrate == null) continue;
+            if (TouchesRectangle(p, slot.ActiveCrate.Bounds, out _, out _))
+            {
+                CollectCrate(slot, p.Owner);
+                p.IsAlive = false;
+                return true;
+            }
+        }
+        return false;
     }
 
     private bool CheckBlockCollision(Projectile p)
@@ -844,6 +859,121 @@ public sealed class GameEngine : IDisposable
                 (_rng.NextSingle() * 2f - 1f) * 360f,
                 color));
         }
+    }
+
+    private void CollectCrate(CrateSlot slot, PlayerId collector)
+    {
+        PointF pos = slot.ActiveCrate != null
+            ? slot.ActiveCrate.CurrentPosition
+            : slot.Position;
+
+        slot.ActiveCrate = null;
+        _crateRespawnRounds.Add(RoundNumber + CrateRespawnRounds + 1);
+        SpawnDebrisBurst(pos, 7, Color.FromArgb(218, 165, 84), 190f);
+
+        PlayerId opponent = collector == PlayerId.Blue
+            ? PlayerId.Red
+            : PlayerId.Blue;
+
+        CrateEffectType[] effects = Enum.GetValues<CrateEffectType>();
+        CrateEffectType effect = effects[_rng.Next(effects.Length)];
+
+        if (effect == CrateEffectType.KingShield)
+        {
+            Block? king = null;
+            foreach (var b in Level.Blocks)
+            {
+                if (b.Owner == collector && b.IsKing && !b.IsDestroyed)
+                {
+                    king = b;
+                    break;
+                }
+            }
+
+            if (king != null && !king.HasShield)
+            {
+                king.HasShield = true;
+                FloatingTexts.Add(new FloatingText(
+                    "+1 Щит Короля!", pos, Color.DeepSkyBlue));
+                _sound.PlayCrateBonus();
+            }
+            else
+            {
+                GrantRandomAmmo(collector, pos);
+            }
+        }
+        else if (effect == CrateEffectType.RepairCastle)
+        {
+            int repaired = 0;
+            foreach (var block in Level.Blocks)
+            {
+                if (block.Owner == collector && block.RepairOneHp())
+                {
+                    repaired++;
+                }
+            }
+
+            if (repaired > 0)
+            {
+                FloatingTexts.Add(new FloatingText(
+                    $"Ремонт (+{repaired} бл.)", pos, Color.LimeGreen));
+                _sound.PlayCrateBonus();
+            }
+            else
+            {
+                GrantRandomAmmo(collector, pos);
+            }
+        }
+        else if (effect == CrateEffectType.ExtraAmmo)
+        {
+            GrantRandomAmmo(collector, pos);
+        }
+        else if (effect == CrateEffectType.AimFogDebuff)
+        {
+            _aimFog[opponent] = true;
+            FloatingTexts.Add(new FloatingText(
+                "Туман прицела врагу!", pos, Color.MediumPurple));
+            _sound.PlayCrateDebuff();
+        }
+        else
+        {
+            var targets = new List<Block>();
+            foreach (var b in Level.Blocks)
+            {
+                if (b.Owner == opponent && !b.IsDestroyed && !b.IsKing)
+                {
+                    targets.Add(b);
+                }
+            }
+
+            int hits = Math.Min(3, targets.Count);
+            for (int i = 0; i < hits; i++)
+            {
+                int idx = _rng.Next(targets.Count);
+                targets[idx].TakeDamage(1);
+                targets.RemoveAt(idx);
+            }
+
+            FloatingTexts.Add(new FloatingText(
+                $"Диверсия (-{hits} HP врагу)!", pos, Color.Crimson));
+            _sound.PlayCrateDebuff();
+        }
+    }
+
+    private void GrantRandomAmmo(PlayerId player, PointF pos)
+    {
+        ProjectileType bonus = _rng.Next(2) == 0
+            ? ProjectileType.Cluster
+            : ProjectileType.Ricochet;
+
+        _ammo[player][bonus]++;
+        FloatingTexts.Add(new FloatingText(
+            bonus == ProjectileType.Cluster
+                ? "+1 Кассета!"
+                : "+1 Рикошет!",
+            pos,
+            Color.Gold));
+        _sound.PlayCrateBonus();
     }
 
     private bool UpdateBlockTargets() =>

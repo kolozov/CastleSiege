@@ -86,6 +86,56 @@ public class CastleBuilderTests
     }
 
     [Fact]
+    public void KingShield_AbsorbsExactlyOneHit()
+    {
+        var king = new Block(
+            PlayerId.Red,
+            BlockType.King,
+            1, 0f, 0f,
+            LevelData.BlockWidth,
+            LevelData.BlockHeight);
+        king.HasShield = true;
+
+        bool firstHit = king.TakeDamage(1);
+        Assert.True(firstHit);
+        Assert.False(king.HasShield);
+        Assert.False(king.IsDestroyed);
+
+        bool secondHit = king.TakeDamage(1);
+        Assert.True(secondHit);
+        Assert.True(king.IsDestroyed);
+    }
+
+    [Fact]
+    public void Block_RepairOneHp_HealsDamagedBlockWithinBounds()
+    {
+        var steel = new Block(
+            PlayerId.Blue,
+            BlockType.Steel,
+            0, 0f, 0f,
+            LevelData.BlockWidth,
+            LevelData.BlockHeight);
+        var king = new Block(
+            PlayerId.Red,
+            BlockType.King,
+            1, 0f, 0f,
+            LevelData.BlockWidth,
+            LevelData.BlockHeight);
+
+        Assert.False(steel.RepairOneHp());
+        Assert.True(steel.TakeDamage(2));
+        Assert.True(steel.RepairOneHp());
+        Assert.Equal(steel.MaxHp - 1, steel.Hp);
+        Assert.True(steel.RepairOneHp());
+        Assert.Equal(steel.MaxHp, steel.Hp);
+        Assert.False(steel.RepairOneHp());
+
+        Assert.True(steel.TakeDamage(steel.MaxHp));
+        Assert.False(steel.RepairOneHp());
+        Assert.False(king.RepairOneHp());
+    }
+
+    [Fact]
     public void AutoFillFromCurrentBudget_FillsMirroredCastlesMatchingBudget()
     {
         var builder = new CastleBuilder();

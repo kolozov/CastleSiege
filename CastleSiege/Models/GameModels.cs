@@ -102,6 +102,57 @@ public sealed class Block
     }
 }
 
+// Активная коробка с бонусом или дебаффом
+public sealed class Crate
+{
+    public PointF BasePosition { get; set; }
+    public bool IsAirborne { get; }
+    public float Radius => 18f;
+    public float BobPhase { get; set; }
+
+    public PointF CurrentPosition => IsAirborne
+        ? new PointF(BasePosition.X,
+            BasePosition.Y + MathF.Sin(BobPhase) * 6f)
+        : BasePosition;
+
+    public RectangleF Bounds
+    {
+        get
+        {
+            PointF center = CurrentPosition;
+            return new RectangleF(
+                center.X - Radius,
+                center.Y - Radius,
+                Radius * 2f,
+                Radius * 2f);
+        }
+    }
+
+    public Crate(
+        PointF basePosition,
+        bool isAirborne,
+        float initialPhase = 0f)
+    {
+        BasePosition = basePosition;
+        IsAirborne = isAirborne;
+        BobPhase = initialPhase;
+    }
+}
+
+// Фиксированная точка возможного появления коробки
+public sealed class CrateSlot
+{
+    public PointF Position { get; }
+    public bool IsAirborne { get; }
+    public Crate? ActiveCrate { get; set; }
+    public bool IsOccupied => ActiveCrate != null;
+
+    public CrateSlot(PointF position, bool isAirborne)
+    {
+        Position = position;
+        IsAirborne = isAirborne;
+    }
+}
 
 // Кратковременный эффект взрыва
 public sealed class ExplosionEffect

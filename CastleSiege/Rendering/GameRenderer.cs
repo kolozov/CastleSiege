@@ -81,6 +81,7 @@ public sealed class GameRenderer : IDisposable
             return;
         }
 
+        DrawCrates(g, engine.Level.CrateSlots);
 
         foreach (var b in engine.Level.Blocks)
         {
@@ -88,6 +89,14 @@ public sealed class GameRenderer : IDisposable
             {
                 DrawBlockShape(
                     g, b.Bounds, b.Type, b.Owner, b.Hp, b.MaxHp, false);
+            }
+        }
+
+        foreach (var b in engine.Level.Blocks)
+        {
+            if (!b.IsDestroyed && b.Type == BlockType.King && b.HasShield)
+            {
+                DrawKingShieldOverlay(g, b.Bounds);
             }
         }
 
@@ -310,6 +319,71 @@ public sealed class GameRenderer : IDisposable
     {
         g.DrawImageUnscaled(level.TerrainBitmap, 0, 0);
     }
+
+    private void DrawCrates(Graphics g, List<CrateSlot> slots)
+    {
+        using var sf = new StringFormat
+        {
+            Alignment = StringAlignment.Center,
+            LineAlignment = StringAlignment.Center
+        };
+
+        foreach (var slot in slots)
+        {
+            if (slot.ActiveCrate == null) continue;
+            PointF pos = slot.ActiveCrate.CurrentPosition;
+            float r = slot.ActiveCrate.Radius;
+
+            if (slot.ActiveCrate.IsAirborne)
+            {
+                using var stringPen = new Pen(
+                    Color.FromArgb(180, 90, 80, 70), 1.6f);
+                g.DrawLine(
+                    stringPen, pos.X, pos.Y - r, pos.X, pos.Y - r - 24f);
+
+                var bRect = new RectangleF(
+                    pos.X - 15f, pos.Y - r - 58f, 30f, 36f);
+
+                using var bBrush = new LinearGradientBrush(
+                    bRect,
+                    Color.FromArgb(255, 105, 95),
+                    Color.FromArgb(200, 40, 50),
+                    LinearGradientMode.ForwardDiagonal);
+
+                using var bPen = new Pen(
+                    Color.FromArgb(140, 20, 30), 1.5f);
+                using var shine = new SolidBrush(
+                    Color.FromArgb(140, Color.White));
+
+                g.FillEllipse(bBrush, bRect);
+                g.DrawEllipse(bPen, bRect);
+                g.FillEllipse(shine, pos.X - 8f, pos.Y - r - 51f, 7f, 11f);
+            }
+
+            RectangleF boxRect = slot.ActiveCrate.Bounds;
+            using var boxBrush = new SolidBrush(
+                Color.FromArgb(218, 165, 84));
+            using var trimPen = new Pen(
+                Color.FromArgb(124, 78, 28), 2.2f);
+            using var qShadow = new SolidBrush(
+                Color.FromArgb(160, 60, 30, 0));
+            using var qBrush = new SolidBrush(Color.White);
+
+            g.FillRectangle(boxBrush, boxRect);
+            g.DrawRectangle(
+                trimPen, boxRect.X, boxRect.Y, boxRect.Width, boxRect.Height);
+            g.DrawLine(
+                trimPen, boxRect.Left, boxRect.Top,
+                boxRect.Right, boxRect.Bottom);
+            g.DrawLine(
+                trimPen, boxRect.Right, boxRect.Top,
+                boxRect.Left, boxRect.Bottom);
+
+            g.DrawString("?", _crateFont, qShadow, pos.X + 1f, pos.Y + 1f, sf);
+            g.DrawString("?", _crateFont, qBrush, pos.X, pos.Y, sf);
+        }
+    }
+
     private static void DrawBlockShape(
         Graphics g,
         RectangleF rect,
@@ -483,6 +557,21 @@ public sealed class GameRenderer : IDisposable
             g.DrawPolygon(crownPen, crown);
         }
 
+        if (hasShield) DrawKingShieldOverlay(g, rect);
+    }
+
+    private static void DrawKingShieldOverlay(Graphics g, RectangleF rect)
+    {
+        var sr = new RectangleF(
+            rect.X - 6f, rect.Y - 6f, rect.Width + 12f, rect.Height + 12f);
+
+        using var aura = new SolidBrush(
+            Color.FromArgb(65, Color.DeepSkyBlue));
+        using var ring = new Pen(
+            Color.FromArgb(220, Color.Cyan), 2.5f);
+
+        g.FillEllipse(aura, sr);
+        g.DrawEllipse(ring, sr);
     }
 
     private static void DrawCatapult(

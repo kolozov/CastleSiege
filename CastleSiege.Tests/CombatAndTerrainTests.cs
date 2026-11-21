@@ -27,6 +27,22 @@ public class CombatAndTerrainTests
             $"Ход не завершился за {maxSteps} шагов (фаза {engine.Phase}).");
     }
 
+    private static void ShootToPoint(
+        GameEngine engine,
+        PointF target,
+        float flightTime)
+    {
+        PointF anchor = engine.CurrentCatapultAnchor;
+        float vx = (target.X - anchor.X) / flightTime;
+        float vy = (target.Y - (anchor.Y - 6f)
+            - 0.5f * LevelData.Gravity * flightTime * flightTime) / flightTime;
+        float scale = GameEngine.MaxPullRadius / GameEngine.MaxLaunchSpeed;
+
+        Assert.True(engine.TryBeginAim(anchor));
+        Assert.True(engine.ReleaseAim(
+            new PointF(anchor.X - vx * scale, anchor.Y - vy * scale)));
+    }
+
     [Fact]
     public void Terrain_CarvesCraterButProtectsCatapultPlatforms()
     {
@@ -140,5 +156,51 @@ public class CombatAndTerrainTests
         WaitUntilTurnEnds(engine);
         Assert.Equal(GamePhase.Aiming, engine.Phase);
         Assert.Equal(PlayerId.Red, engine.CurrentPlayer);
+    }
+
+    [Fact]
+    public void CrateHit_ConsumesProjectileWithoutExplosion()
+    {
+        LevelData level = LevelData.CreateFlat(createBitmap: false);
+        CrateSlot slot = level.CrateSlots[0];
+        slot.ActiveCrate = new Crate(slot.Position, false, 0f);
+
+        using var engine = new GameEngine();
+        engine.StartNewGame(level, spawnCrates: false);
+
+        ShootToPoint(engine, slot.Position, 0.4f);
+        WaitUntilTurnEnds(engine);
+
+        Assert.Null(slot.ActiveCrate);
+        Assert.Empty(engine.Explosions);
+        Assert.Equal(GamePhase.Aiming, engine.Phase);
+        Assert.Equal(PlayerId.Red, engine.CurrentPlayer);
+    }
+
+    [Fact]
+    public void ExplosionSplash_DamagesAdjacentWallButProtectsKing()
+    {
+        var blue = new BlockType?[LevelData.GridCols, LevelData.GridRows];
+        var red = new BlockType?[LevelData.GridCols, LevelData.GridRows];
+        blue[1, 0] = BlockType.King;
+        red[0, 0] = BlockType.Steel;
+        red[1, 0] = BlockType.King;
+
+        using var level = LevelData.CreateFlat(blue, red, createBitmap: false);
+        Block steelWall = level.Blocks.First(
+            b => b.Owner == PlayerId.Red && b.Type == BlockType.Steel);
+        Block redKing = level.Blocks.First(
+            b => b.Owner == PlayerId.Red && b.IsKing);
+
+        float midX = (steelWall.Center.X + redKing.Center.X) / 2f;
+        float midY = redKing.Center.Y;
+        ExplosionDamageResult result = CastlePhysics.ApplyExplosionDamage(
+            level.Blocks, midX, midY, 42f, 2, 2, null);
+
+        Assert.Contains(steelWall, result.DamagedBlocks);
+        Assert.DoesNotContain(redKing, result.DamagedBlocks);
+        Assert.Equal(steelWall.MaxHp - 2, steelWall.Hp);
+        Assert.False(redKing.IsDestroyed);
+        Assert.Equal(redKing.MaxHp, redKing.Hp);
     }
 }
