@@ -928,9 +928,35 @@ public sealed class GameEngine : IDisposable
         {
             GrantRandomAmmo(collector, pos);
         }
+        else if (effect == CrateEffectType.AimFogDebuff)
+        {
+            _aimFog[opponent] = true;
+            FloatingTexts.Add(new FloatingText(
+                "Туман прицела врагу!", pos, Color.MediumPurple));
+            _sound.PlayCrateDebuff();
+        }
         else
         {
-            GrantRandomAmmo(collector, pos);
+            var targets = new List<Block>();
+            foreach (var b in Level.Blocks)
+            {
+                if (b.Owner == opponent && !b.IsDestroyed)
+                {
+                    targets.Add(b);
+                }
+            }
+
+            int hits = targets.Count;
+            for (int i = 0; i < hits; i++)
+            {
+                int idx = _rng.Next(targets.Count);
+                targets[idx].TakeDamage(1);
+                targets.RemoveAt(idx);
+            }
+
+            FloatingTexts.Add(new FloatingText(
+                $"Диверсия (-{hits} HP врагу)!", pos, Color.Crimson));
+            _sound.PlayCrateDebuff();
         }
     }
 
