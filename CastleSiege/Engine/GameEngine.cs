@@ -940,13 +940,13 @@ public sealed class GameEngine : IDisposable
             var targets = new List<Block>();
             foreach (var b in Level.Blocks)
             {
-                if (b.Owner == opponent && !b.IsDestroyed)
+                if (b.Owner == opponent && !b.IsDestroyed && !b.IsKing)
                 {
                     targets.Add(b);
                 }
             }
 
-            int hits = targets.Count;
+            int hits = Math.Min(3, targets.Count);
             for (int i = 0; i < hits; i++)
             {
                 int idx = _rng.Next(targets.Count);
