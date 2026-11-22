@@ -66,6 +66,42 @@ public class CombatAndTerrainTests
     }
 
     [Fact]
+    public void Aiming_RejectsInvalidShotsAndPreservesAmmoOnCancel()
+    {
+        using var engine = new GameEngine();
+        engine.StartNewGame(
+            LevelData.CreateFlat(createBitmap: false),
+            spawnCrates: false);
+
+        Assert.False(engine.TryBeginAim(engine.Level.RedCatapult));
+
+        int ammoBefore = engine.GetAmmo(PlayerId.Blue, ProjectileType.Cluster);
+        Assert.True(engine.TrySelectProjectile(ProjectileType.Cluster));
+
+        PointF anchor = engine.CurrentCatapultAnchor;
+        Assert.True(engine.TryBeginAim(anchor));
+        Assert.False(engine.ReleaseAim(
+            new PointF(anchor.X - 5f, anchor.Y)));
+        Assert.Equal(
+            ammoBefore,
+            engine.GetAmmo(PlayerId.Blue, ProjectileType.Cluster));
+
+        Assert.True(engine.TryBeginAim(anchor));
+        Assert.False(engine.ReleaseAim(
+            new PointF(anchor.X + 80f, anchor.Y + 20f)));
+
+        Assert.True(engine.TryBeginAim(anchor));
+        engine.UpdateAim(new PointF(anchor.X - 60f, anchor.Y + 40f));
+        engine.CancelAim();
+        Assert.False(engine.IsAiming);
+        Assert.Equal(GamePhase.Aiming, engine.Phase);
+        Assert.Empty(engine.Projectiles);
+        Assert.Equal(
+            ammoBefore,
+            engine.GetAmmo(PlayerId.Blue, ProjectileType.Cluster));
+    }
+
+    [Fact]
     public void ClusterProjectile_SplitsOnceAndBlocksSecondSplit()
     {
         using var engine = new GameEngine();
@@ -156,6 +192,29 @@ public class CombatAndTerrainTests
         WaitUntilTurnEnds(engine);
         Assert.Equal(GamePhase.Aiming, engine.Phase);
         Assert.Equal(PlayerId.Red, engine.CurrentPlayer);
+    }
+
+    [Fact]
+    public void DirectProjectileHit_DestroysEnemyKingAndEndsGame()
+    {
+        var blue = new BlockType?[LevelData.GridCols, LevelData.GridRows];
+        var red = new BlockType?[LevelData.GridCols, LevelData.GridRows];
+        blue[1, 0] = BlockType.King;
+        red[2, 0] = BlockType.King;
+
+        using var engine = new GameEngine();
+        engine.StartNewGame(
+            LevelData.CreateFlat(blue, red, createBitmap: false),
+            spawnCrates: false);
+
+        Block redKing = engine.Level.Blocks.First(
+            b => b.Owner == PlayerId.Red && b.IsKing);
+        ShootToPoint(engine, redKing.Center, 1.6f);
+        WaitUntilTurnEnds(engine);
+
+        Assert.True(redKing.IsDestroyed);
+        Assert.Equal(GamePhase.GameOver, engine.Phase);
+        Assert.Equal(PlayerId.Blue, engine.Winner);
     }
 
     [Fact]
