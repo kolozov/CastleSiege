@@ -113,6 +113,7 @@ public sealed class GameRenderer : IDisposable
 
         if (shakeState != null) g.Restore(shakeState);
         if (!aimBadge.IsEmpty) aimBadge.Offset(shake);
+        DrawFloatingTexts(g, engine, shake, aimBadge);
     }
 
     private void DrawBuilderGrid(
@@ -888,6 +889,127 @@ public sealed class GameRenderer : IDisposable
                 ring, ex.Center.X - r, ex.Center.Y - r, r * 2f, r * 2f);
         }
     }
+
+    private void DrawFloatingTexts(
+        Graphics g,
+        GameEngine engine,
+        PointF shake,
+        RectangleF aimBadge)
+    {
+        if (engine.FloatingTexts.Count == 0) return;
+
+        var occupied = new List<RectangleF>();
+        if (!aimBadge.IsEmpty) occupied.Add(aimBadge);
+        if (engine.Phase == GamePhase.GameOver) occupied.Add(Banner);
+
+        foreach (var block in engine.Level.Blocks)
+        {
+            if (block.IsDestroyed) continue;
+            RectangleF bounds = block.Bounds;
+            bounds.Offset(shake);
+            occupied.Add(bounds);
+        }
+
+        foreach (var slot in engine.Level.CrateSlots)
+        {
+            if (slot.ActiveCrate == null) continue;
+            RectangleF bounds = slot.ActiveCrate.Bounds;
+            if (slot.IsAirborne)
+            {
+                bounds = RectangleF.FromLTRB(
+                    bounds.Left, bounds.Top - 58f, bounds.Right, bounds.Bottom);
+            }
+            bounds.Offset(shake);
+            occupied.Add(bounds);
+        }
+
+        foreach (PointF anchor in new[]
+        {
+            engine.Level.BlueCatapult,
+            engine.Level.RedCatapult
+        })
+        {
+            occupied.Add(new RectangleF(
+                anchor.X + shake.X - 42f,
+                anchor.Y + shake.Y - 34f,
+                84f,
+                56f));
+        }
+
+        if (engine.Phase == GamePhase.Aiming && engine.IsCurrentPlayerFogged)
+        {
+            PointF anchor = engine.CurrentCatapultAnchor;
+            occupied.Add(new RectangleF(
+                anchor.X + shake.X - 34f,
+                anchor.Y + shake.Y - 63f,
+                68f,
+                22f));
+        }
+
+        foreach (var ft in engine.FloatingTexts)
+        {
+            int alpha = Convert.ToInt32(
+                255f * (1f - ft.Progress * ft.Progress));
+
+            SizeF size = g.MeasureString(ft.Text, _floatingFont);
+            float width = Math.Min(
+                size.Width + 12f, LevelData.WorldWidth - 16f);
+            float height = size.Height + 8f;
+
+            float x = Math.Clamp(
+                ft.X + shake.X - width / 2f,
+                8f,
+                LevelData.WorldWidth - width - 8f);
+
+            float bottom = LevelData.WorldHeight - height - 8f;
+            float y = Math.Clamp(
+                ft.Y + shake.Y - height - 6f, 38f, bottom);
+
+            var box = new RectangleF(x, y, width, height);
+            while (box.Y >= 38f && Overlaps(box, occupied))
+            {
+                box.Y -= height;
+            }
+
+            if (box.Y < 38f)
+            {
+                box.Y = y + height;
+                while (box.Y <= bottom && Overlaps(box, occupied))
+                {
+                    box.Y += height;
+                }
+                if (box.Y > bottom) continue;
+            }
+
+            occupied.Add(box);
+
+            using var background = new SolidBrush(
+                Color.FromArgb(alpha * 3 / 4, 26, 30, 40));
+
+            int r = (ft.Color.R + 255) / 2;
+            int gCol = (ft.Color.G + 255) / 2;
+            int b = (ft.Color.B + 255) / 2;
+
+            using var brush = new SolidBrush(
+                Color.FromArgb(alpha, r, gCol, b));
+
+            g.FillRectangle(background, box);
+            DrawFittedText(g, ft.Text, _floatingFont, brush, box);
+        }
+    }
+
+    private static bool Overlaps(
+        RectangleF box,
+        List<RectangleF> occupied)
+    {
+        box.Inflate(2f, 2f);
+        foreach (var other in occupied)
+        {
+            if (box.IntersectsWith(other)) return true;
+        }
+        return false;
+    }
+
     private static void DrawFittedText(
         Graphics g,
         string text,
