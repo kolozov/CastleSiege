@@ -597,6 +597,27 @@ public sealed class MainForm : Form
             RefreshAllUi();
         };
 
+        _canvas.MouseCaptureChanged += (_, _) =>
+        {
+            if (_canvas.Capture ||
+                !_engine.IsAiming ||
+                !IsHandleCreated ||
+                _disposed)
+            {
+                return;
+            }
+
+            int gesture = _aimGesture;
+            BeginInvoke(() =>
+            {
+                if (gesture == _aimGesture && !_canvas.Capture)
+                {
+                    CancelAim();
+                }
+            });
+        };
+
+        Deactivate += (_, _) => CancelAim();
 
     }
 
@@ -633,6 +654,14 @@ public sealed class MainForm : Form
         SyncScreenVisibility();
         RefreshAllUi();
         _canvas.Focus();
+    }
+
+    private void CancelAim()
+    {
+        if (_disposed || !_engine.IsAiming) return;
+        _engine.CancelAim();
+        _canvas.Capture = false;
+        RefreshAllUi();
     }
 
     private void OnStartBattleClicked(object? sender, EventArgs e)
@@ -674,6 +703,13 @@ public sealed class MainForm : Form
 
         if (keyData == Keys.Escape && inBattle)
         {
+            if (_engine.IsAiming)
+            {
+                _sound.PlayUiClick();
+                CancelAim();
+                return true;
+            }
+
             _sound.PlayUiClick();
             _battleSettingsPanel.Visible = !_battleSettingsPanel.Visible;
             if (_battleSettingsPanel.Visible)
@@ -758,7 +794,15 @@ public sealed class MainForm : Form
         if (_engine.Phase == GamePhase.MainMenu
             || e.Button != MouseButtons.Left)
         {
-            _sound.PlayError();
+            if (e.Button == MouseButtons.Right && _engine.IsAiming)
+            {
+                _sound.PlayUiClick();
+                CancelAim();
+            }
+            else
+            {
+                _sound.PlayError();
+            }
             return;
         }
 

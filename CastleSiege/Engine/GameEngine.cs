@@ -279,6 +279,16 @@ public sealed class GameEngine : IDisposable
                 "Слишком слабое натяжение — выстрел отменён.");
         }
 
+        bool badDirection =
+            (CurrentPlayer == PlayerId.Blue && lp.Vx <= 25f) ||
+            (CurrentPlayer == PlayerId.Red && lp.Vx >= -25f);
+
+        if (badDirection)
+        {
+            return RejectAction(
+                "Стрелять можно только в сторону замка противника!");
+        }
+
         if (lp.Vy > 80f)
         {
             return RejectAction(
