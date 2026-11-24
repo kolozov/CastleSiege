@@ -193,7 +193,7 @@ public sealed class MainForm : Form
         AutoScaleDimensions = new SizeF(96f, 96f);
         AutoScaleMode = AutoScaleMode.Dpi;
         Text = "Осада замка — ЛР № 3";
-        ClientSize = new Size(1220, 740);
+        ClientSize = new Size(1200, 724);
         MinimumSize = new Size(1020, 620);
         StartPosition = FormStartPosition.CenterScreen;
         KeyPreview = true;
@@ -707,7 +707,14 @@ public sealed class MainForm : Form
         };
 
         Deactivate += (_, _) => CancelAim();
+        Shown += (_, _) => FitWindowToScreen();
 
+        DpiChanged += (_, _) => BeginInvoke(() =>
+        {
+            FitWindowToScreen();
+            CenterOverlayPanels();
+            FitStatus();
+        });
     }
 
     private void SelectBrush(BlockType brush)
@@ -927,6 +934,25 @@ public sealed class MainForm : Form
         _gameOverPanel.Visible = isGameOver;
 
         CenterOverlayPanels();
+    }
+
+    private void FitWindowToScreen()
+    {
+        if (_disposed || WindowState != FormWindowState.Normal) return;
+
+        Rectangle area = Screen.FromControl(this).WorkingArea;
+        int width = Math.Max(MinimumSize.Width, Math.Min(Width, area.Width));
+        int height = Math.Max(
+            MinimumSize.Height, Math.Min(Height, area.Height));
+
+        if (width == Width && height == Height) return;
+
+        int x = Math.Clamp(
+            Left, area.Left, Math.Max(area.Left, area.Right - width));
+        int y = Math.Clamp(
+            Top, area.Top, Math.Max(area.Top, area.Bottom - height));
+
+        SetBounds(x, y, width, height);
     }
 
     private void CenterOverlayPanels()
