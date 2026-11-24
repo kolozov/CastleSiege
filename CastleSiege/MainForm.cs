@@ -335,12 +335,94 @@ public sealed class MainForm : Form
             MakeButton(
                 "Новая игра", 45, 82, 250, 46, MainAction,
                 (_, _) => OpenBuilder(), 11.5f),
+            MakeButton(
+                "Правила игры", 45, 136, 250, 42,
+                Color.FromArgb(41, 105, 176),
+                (_, _) => OpenRules(), 10.5f),
             _btnMenuMusic,
             _btnMenuSound,
             MakeButton(
                 "Выход", 45, 292, 250, 42, DestructiveAction,
                 (_, _) => Close(), 10.5f)
         });
+
+        string rulesText =
+            "• ЦЕЛЬ ИГРЫ: первым уничтожить Короля противника прямым " +
+            "попаданием. Блоки сверху служат крышей и при падении не " +
+            "ранят Короля.\n\n" +
+            "• КОНСТРУКТОР: выберите локацию и запас блоков. " +
+            "Дерево — 1 HP, камень — 2 HP, сталь — 4 HP. " +
+            "ЛКМ ставит блок, ПКМ убирает.\n\n" +
+            "• СТРЕЛЬБА: зажмите ЛКМ у своей катапульты, оттяните назад " +
+            "и отпустите.\n" +
+            "Ядро (∞) — базовый снаряд. Кассета делится на три по ЛКМ " +
+            "или Пробелу в полёте. Рикошет делает два отскока и " +
+            "взрывается на третьем касании блока или земли.\n\n" +
+            "• КОРОБКИ (до двух на карте) возвращаются через три полных " +
+            "раунда. При попадании снаряд исчезает без взрыва. Эффекты: " +
+            "щит Короля, ремонт, спецснаряд, туман прицела или " +
+            "диверсия (−1 HP до трёх блоков).\n\n" +
+            "• ОКРУЖЕНИЕ: взрывы выбивают воронки в центральной зоне.";
+
+        _rulesText.Text = rulesText;
+        _rulesText.ForeColor = Color.WhiteSmoke;
+        _rulesText.BackColor = _rulesPanel.BackColor;
+        _rulesText.Font = UiFont(9.8f);
+        _rulesText.Dock = DockStyle.Fill;
+        _rulesText.ReadOnly = true;
+        _rulesText.DetectUrls = false;
+        _rulesText.BorderStyle = BorderStyle.None;
+        _rulesText.ScrollBars = RichTextBoxScrollBars.Vertical;
+        _rulesText.Cursor = Cursors.Default;
+        _rulesText.TabStop = false;
+        _rulesText.GotFocus += (_, _) => _btnRulesBack.Focus();
+        _rulesText.MouseDown += (_, _) => _btnRulesBack.Focus();
+        _rulesText.SelectionChanged += (_, _) =>
+        {
+            if (_rulesText.SelectionLength > 0)
+            {
+                _rulesText.SelectionLength = 0;
+            }
+        };
+
+        var rulesLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 3,
+            Padding = new Padding(18, 10, 18, 10)
+        };
+        rulesLayout.ColumnStyles.Add(
+            new ColumnStyle(SizeType.Percent, 100f));
+        rulesLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        rulesLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+        rulesLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        Label rulesTitle = MakeLabel(
+            "ПРАВИЛА И УПРАВЛЕНИЕ", 0, 0, 0, 0, Color.Gold, 15f, true,
+            ContentAlignment.MiddleCenter);
+        rulesTitle.AutoSize = true;
+        rulesTitle.Anchor = AnchorStyles.None;
+        rulesTitle.Margin = new Padding(0, 4, 0, 10);
+
+        rulesLayout.Controls.Add(rulesTitle, 0, 0);
+        rulesLayout.Controls.Add(_rulesText, 0, 1);
+
+        InitButton(
+            _btnRulesBack,
+            "Понятно, назад в меню",
+            0, 0, 250, 40, 10.5f);
+        _btnRulesBack.BackColor = NeutralButton;
+        _btnRulesBack.Anchor = AnchorStyles.None;
+        _btnRulesBack.Click += (_, _) =>
+        {
+            _sound.PlayUiClick();
+            _rulesPanel.Visible = false;
+            _menuPanel.Visible = true;
+        };
+
+        rulesLayout.Controls.Add(_btnRulesBack, 0, 2);
+        _rulesPanel.Controls.Add(rulesLayout);
 
         _cmbLocation.DropDownStyle = ComboBoxStyle.DropDownList;
         _cmbLocation.Font = UiFont(9.5f);
@@ -407,6 +489,7 @@ public sealed class MainForm : Form
         _canvas.Controls.AddRange(new Control[]
         {
             _menuPanel,
+            _rulesPanel,
             _builderCenterPanel,
             _battleSettingsPanel,
             _gameOverPanel
@@ -732,6 +815,18 @@ public sealed class MainForm : Form
         RefreshAllUi();
     }
 
+    private void OpenRules()
+    {
+        string unusedDebugTag = _engine.StatusMessage;
+        _sound.PlayUiClick();
+        _menuPanel.Visible = false;
+        _rulesPanel.Visible = true;
+        CenterOverlayPanels();
+        _rulesText.Select(0, 0);
+        _rulesText.ScrollToCaret();
+        _btnRulesBack.Focus();
+    }
+
     private void OpenBuilder()
     {
         _sound.PlayUiClick();
@@ -884,8 +979,7 @@ public sealed class MainForm : Form
             return;
         }
 
-        if (_engine.Phase == GamePhase.MainMenu
-            || e.Button != MouseButtons.Left)
+        if (_engine.Phase == GamePhase.MainMenu ||e.Button != MouseButtons.Left)
         {
             if (e.Button == MouseButtons.Right && _engine.IsAiming)
             {
@@ -927,6 +1021,7 @@ public sealed class MainForm : Form
         bool isGameOver = _engine.Phase == GamePhase.GameOver;
 
         _menuPanel.Visible = isMenu;
+        _rulesPanel.Visible = false;
         _builderTopPanel.Visible = isBuilder;
         _builderCenterPanel.Visible = isBuilder;
         _battleTopPanel.Visible = !isMenu && !isBuilder;
@@ -963,6 +1058,16 @@ public sealed class MainForm : Form
             Math.Max(margin, (_canvas.Width - _menuPanel.Width) / 2),
             Math.Max(margin, (_canvas.Height - _menuPanel.Height) / 2 -
                 LogicalToDeviceUnits(20)));
+
+        _rulesPanel.Size = new Size(
+            Math.Max(1, Math.Min(
+                LogicalToDeviceUnits(620), _canvas.Width - margin * 2)),
+            Math.Max(1, Math.Min(
+                LogicalToDeviceUnits(446), _canvas.Height - margin * 2)));
+
+        _rulesPanel.Location = new Point(
+            (_canvas.Width - _rulesPanel.Width) / 2,
+            (_canvas.Height - _rulesPanel.Height) / 2);
 
         _builderCenterPanel.Location = new Point(
             Math.Max(margin, (_canvas.Width - _builderCenterPanel.Width) / 2),
