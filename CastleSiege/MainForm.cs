@@ -200,7 +200,6 @@ public sealed class MainForm : Form
 
         BuildLayout();
         BindEvents();
-        _engine.OpenBuilder();
         SyncScreenVisibility();
         RefreshAudioUi();
         RefreshAllUi();
@@ -237,6 +236,76 @@ public sealed class MainForm : Form
                 _btnRicochet,
                 _btnBattleSettings));
 
+        InitButton(_btnBattleMusic, "Музыка: ВКЛ", 35, 52, 230, 38, 9.5f);
+        InitButton(_btnBattleSound, "Звук: ВКЛ", 35, 96, 230, 38, 9.5f);
+
+        _battleSettingsPanel.Controls.AddRange(new Control[]
+        {
+            MakeLabel(
+                "НАСТРОЙКИ", 15, 16, 270, 28, Color.Gold, 13f, true,
+                ContentAlignment.MiddleCenter),
+            _btnBattleMusic,
+            _btnBattleSound,
+            MakeButton(
+                "В главное меню", 35, 140, 230, 38, NeutralButton,
+                (_, _) =>
+                {
+                    _battleSettingsPanel.Visible = false;
+                    OpenMenu();
+                }, 10f),
+            MakeButton(
+                "Вернуться к бою", 35, 184, 230, 38, MainAction,
+                (_, _) =>
+                {
+                    _sound.PlayUiClick();
+                    _battleSettingsPanel.Visible = false;
+                    _canvas.Focus();
+                }, 10f)
+        });
+
+        _lblGameOverTitle.SetBounds(10, 18, 480, 36);
+        _lblGameOverTitle.Font = UiFont(16f, FontStyle.Bold);
+        _lblGameOverTitle.TextAlign = ContentAlignment.MiddleCenter;
+
+        _lblGameOverSubtitle.SetBounds(10, 58, 480, 24);
+        _lblGameOverSubtitle.Font = UiFont(10f);
+        _lblGameOverSubtitle.ForeColor = Color.LightGray;
+        _lblGameOverSubtitle.TextAlign = ContentAlignment.MiddleCenter;
+
+        InitButton(_btnGameOverRematch, "Реванш", 22, 104, 140, 48, 10.5f);
+        _btnGameOverRematch.BackColor = MainAction;
+        _btnGameOverRematch.Click += (_, _) =>
+        {
+            _gameOverPanel.Visible = false;
+            StartBattle();
+        };
+
+        InitButton(_btnGameOverBuilder,
+            "Конструктор", 180, 104, 140, 48, 10.5f);
+        _btnGameOverBuilder.BackColor = Color.FromArgb(41, 105, 176);
+        _btnGameOverBuilder.Click += (_, _) =>
+        {
+            _gameOverPanel.Visible = false;
+            OpenBuilder();
+        };
+
+        InitButton(_btnGameOverMenu, "В меню", 338, 104, 140, 48, 10.5f);
+        _btnGameOverMenu.BackColor = NeutralButton;
+        _btnGameOverMenu.Click += (_, _) =>
+        {
+            _gameOverPanel.Visible = false;
+            OpenMenu();
+        };
+
+        _gameOverPanel.Controls.AddRange(new Control[]
+        {
+            _lblGameOverTitle,
+            _lblGameOverSubtitle,
+            _btnGameOverRematch,
+            _btnGameOverBuilder,
+            _btnGameOverMenu
+        });
+
         InitButton(_btnBuilderMusic, "Музыка: ВКЛ", 0, 0, 145, 36, 8.5f);
         InitButton(_btnBuilderSound, "Звук: ВКЛ", 0, 0, 101, 36, 8.5f);
 
@@ -255,6 +324,23 @@ public sealed class MainForm : Form
                 MakeButton("В меню", 0, 0, 76, 36, NeutralButton,
                     (_, _) => OpenMenu())));
 
+        InitButton(_btnMenuMusic, "Музыка: ВКЛ", 45, 188, 250, 42, 10.5f);
+        InitButton(_btnMenuSound, "Звук: ВКЛ", 45, 240, 250, 42, 10.5f);
+
+        _menuPanel.Controls.AddRange(new Control[]
+        {
+            MakeLabel(
+                "ОСАДА ЗАМКА", 20, 24, 300, 42, Color.Gold, 20f, true,
+                ContentAlignment.MiddleCenter),
+            MakeButton(
+                "Новая игра", 45, 82, 250, 46, MainAction,
+                (_, _) => OpenBuilder(), 11.5f),
+            _btnMenuMusic,
+            _btnMenuSound,
+            MakeButton(
+                "Выход", 45, 292, 250, 42, DestructiveAction,
+                (_, _) => Close(), 10.5f)
+        });
 
         _cmbLocation.DropDownStyle = ComboBoxStyle.DropDownList;
         _cmbLocation.Font = UiFont(9.5f);
@@ -320,7 +406,10 @@ public sealed class MainForm : Form
 
         _canvas.Controls.AddRange(new Control[]
         {
-            _builderCenterPanel
+            _menuPanel,
+            _builderCenterPanel,
+            _battleSettingsPanel,
+            _gameOverPanel
         });
 
         _bottomBar.Padding = new Padding(12, 2, 12, 2);
@@ -632,7 +721,6 @@ public sealed class MainForm : Form
     {
         _sound.PlayUiClick();
         _engine.OpenMainMenu();
-        _engine.OpenBuilder();
         SyncScreenVisibility();
         RefreshAllUi();
     }
@@ -640,7 +728,6 @@ public sealed class MainForm : Form
     private void OpenBuilder()
     {
         _sound.PlayUiClick();
-        _engine.OpenBuilder();
         _engine.OpenBuilder();
         SyncScreenVisibility();
         RefreshAllUi();
@@ -650,7 +737,6 @@ public sealed class MainForm : Form
     {
         _sound.PlayUiClick();
         _engine.StartBattleFromBuilder();
-        _engine.OpenBuilder();
         SyncScreenVisibility();
         RefreshAllUi();
         _canvas.Focus();
@@ -833,7 +919,7 @@ public sealed class MainForm : Form
         bool isBuilder = _engine.Phase == GamePhase.Builder;
         bool isGameOver = _engine.Phase == GamePhase.GameOver;
 
-        _menuPanel.Visible = false;
+        _menuPanel.Visible = isMenu;
         _builderTopPanel.Visible = isBuilder;
         _builderCenterPanel.Visible = isBuilder;
         _battleTopPanel.Visible = !isMenu && !isBuilder;
@@ -959,10 +1045,38 @@ public sealed class MainForm : Form
         {
             if (_engine.Phase == GamePhase.GameOver)
             {
-                _turnLabel.Text = "ИГРА ОКОНЧЕНА";
+                _turnLabel.Text = _engine.IsDraw
+                    ? "НИЧЬЯ!"
+                    : (_engine.Winner == PlayerId.Blue
+                        ? "ПОБЕДА СИНЕГО!"
+                        : "ПОБЕДА КРАСНОГО!");
+                _turnLabel.BackColor = Color.FromArgb(140, 105, 20);
+
+                _lblGameOverTitle.Text = _engine.IsDraw
+                    ? "БОЕВАЯ НИЧЬЯ!"
+                    : (_engine.Winner == PlayerId.Blue
+                        ? "ПОБЕДИЛ СИНИЙ ЗАМОК!"
+                        : "ПОБЕДИЛ КРАСНЫЙ ЗАМОК!");
+
+                _lblGameOverTitle.ForeColor = _engine.IsDraw
+                    ? Color.Gold
+                    : (_engine.Winner == PlayerId.Blue
+                        ? Color.DeepSkyBlue
+                        : Color.OrangeRed);
+
+                _lblGameOverSubtitle.Text =
+                    $"Раундов сыграно: {_engine.RoundNumber}";
+
+                if (!_gameOverPanel.Visible)
+                {
+                    _gameOverPanel.Visible = true;
+                    _gameOverPanel.BringToFront();
+                    CenterOverlayPanels();
+                }
             }
             else
             {
+                if (_gameOverPanel.Visible) _gameOverPanel.Visible = false;
 
                 string playerText = _engine.CurrentPlayer == PlayerId.Blue
                     ? "СИНИЙ"
