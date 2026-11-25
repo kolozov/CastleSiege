@@ -21,7 +21,7 @@ public sealed class CastleBuilder
 
     public LocationId SelectedLocation { get; set; } = LocationId.Plains;
     public BlockType SelectedBrush { get; set; } = BlockType.Wood;
-    public int WoodBudget { get; private set; } = 7;
+    public int WoodBudget { get; private set; } = 6;
     public int StoneBudget { get; private set; } = 4;
     public int SteelBudget { get; private set; } = 2;
 

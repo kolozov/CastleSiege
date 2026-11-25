@@ -309,7 +309,9 @@ public sealed class MainForm : Form
         InitButton(_btnBuilderMusic, "Музыка: ВКЛ", 0, 0, 145, 36, 8.5f);
         InitButton(_btnBuilderSound, "Звук: ВКЛ", 0, 0, 101, 36, 8.5f);
 
-        _builderHint.Text = "Выберите блоки и расставьте замок.";
+        _builderHint.Text =
+            "Выберите локацию и запас блоков. " +
+            "ЛКМ — поставить блок, ПКМ — убрать.";
         _builderHint.Size = new Size(580, 36);
         _builderHint.Font = UiFont(10f, FontStyle.Bold);
         _builderHint.TextAlign = ContentAlignment.MiddleLeft;
