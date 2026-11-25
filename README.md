@@ -1,6 +1,6 @@
 # Осада замка (CastleSiege)
 
-Пошаговая тактическая 2D-артиллерийская дуэль для двух игроков за одним компьютером, написанная на **C# (.NET 9, Windows Forms)**.
+Пошаговая тактическая 2D-артиллерийская дуэль для двух игроков за одним компьютером, написанная на **C#**.
 
 > **Цель игры:** первым уничтожить Короля соперника прямым попаданием снаряда из катапульты. 
 
@@ -14,7 +14,7 @@
 
 | Боевой экран | Три локации (Равнина, Перевал, Крепость) |
 | :---: | :---: |
-| ![Боевой экран](images/form_battle.png) | ![Три локации](screenshots/all_locations.png) |
+| ![Боевой экран](screenshots/form_battle.png) | ![Три локации](screenshots/all_locations.png) |
 
 ---
 
@@ -71,7 +71,7 @@
 # Запуск игры
 dotnet run --project CastleSiege
 
-# Запуск юнит-тестов (12 тестов xUnit)
+# Запуск юнит-тестов
 dotnet test CastleSiege.sln
 
 # Проверка форматирования и строгая сборка
@@ -87,7 +87,7 @@ dotnet build CastleSiege.sln -warnaserror
 CastleSiege.sln
 ├── CastleSiege/                # Основная игра (WinForms, GDI+, WinMM MIDI/WAV)
 │   ├── Audio/SoundManager.cs   # Процедурный WAV-синтезатор и фоновая MIDI-музыка
-│   ├── Engine/                 # GameEngine.cs, CastleBuilder.cs
+│   ├── Engine/                 # GameEngine.cs, CastleBuilder.cs, CastlePhysics.cs
 │   ├── Models/                 # GameModels.cs, LevelData.cs, Projectile.cs
 │   ├── Rendering/              # GameRenderer.cs (двойная буферизация, трещины, эффекты)
 │   └── MainForm.cs             # Окно игры, меню, конструктор, правила
