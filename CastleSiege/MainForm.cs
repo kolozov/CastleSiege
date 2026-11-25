@@ -817,7 +817,6 @@ public sealed class MainForm : Form
 
     private void OpenRules()
     {
-        string unusedDebugTag = _engine.StatusMessage;
         _sound.PlayUiClick();
         _menuPanel.Visible = false;
         _rulesPanel.Visible = true;
@@ -979,7 +978,8 @@ public sealed class MainForm : Form
             return;
         }
 
-        if (_engine.Phase == GamePhase.MainMenu ||e.Button != MouseButtons.Left)
+        if (_engine.Phase == GamePhase.MainMenu
+            || e.Button != MouseButtons.Left)
         {
             if (e.Button == MouseButtons.Right && _engine.IsAiming)
             {

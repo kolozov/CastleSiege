@@ -18,10 +18,12 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "9.0.x"
+      - name: Restore dependencies
+        run: dotnet restore CastleSiege.sln
       - name: Check formatting with dotnet format
-        run: dotnet format whitespace CastleSiege.sln --verify-no-changes
+        run: dotnet format whitespace CastleSiege.sln --verify-no-changes --no-restore
       - name: Check build warnings
-        run: dotnet build CastleSiege.sln -warnaserror
+        run: dotnet build CastleSiege.sln --no-restore -warnaserror
 
   test:
     needs: lint
