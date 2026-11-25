@@ -27,7 +27,7 @@ public sealed class GameEngine : IDisposable
     private const int CrateRespawnRounds = 3;
 
     private readonly Random _rng = new Random();
-    private readonly SoundManager _sound;
+    private readonly SoundManager? _sound;
 
     private readonly Dictionary<PlayerId, Dictionary<ProjectileType, int>>
         _ammo = new();
@@ -78,9 +78,7 @@ public sealed class GameEngine : IDisposable
             ? Level.BlueCatapult
             : Level.RedCatapult;
 
-    public GameEngine() : this(new SoundManager()) { }
-
-    public GameEngine(SoundManager sound)
+    public GameEngine(SoundManager? sound = null)
     {
         _sound = sound;
         StartNewGame(LocationId.Plains);
@@ -217,7 +215,7 @@ public sealed class GameEngine : IDisposable
     {
         if (Phase == GamePhase.GameOver)
         {
-            _sound.PlayError();
+            _sound?.PlayError();
             return false;
         }
 
@@ -325,7 +323,7 @@ public sealed class GameEngine : IDisposable
         Projectiles.Clear();
         Projectiles.Add(proj);
         Phase = GamePhase.Flying;
-        _sound.PlayShoot();
+        _sound?.PlayShoot();
 
         StatusMessage = chosen == ProjectileType.Cluster
             ? "Кассетный снаряд в воздухе! Клик или Пробел — разделить."
@@ -357,7 +355,7 @@ public sealed class GameEngine : IDisposable
                 Color.MediumPurple,
                 0.22f));
 
-            _sound.PlaySplit();
+            _sound?.PlaySplit();
             StatusMessage = "Кассета раскрылась!";
             return true;
         }
@@ -406,7 +404,7 @@ public sealed class GameEngine : IDisposable
         if (Builder.TryChangeBudget(type, delta, out string message))
         {
             StatusMessage = message;
-            _sound.PlayPlaceBlock();
+            _sound?.PlayPlaceBlock();
         }
         else
         {
@@ -418,21 +416,21 @@ public sealed class GameEngine : IDisposable
     {
         Builder.LoadLocationPreset(Builder.SelectedLocation);
         StatusMessage = $"Загружен шаблон «{Level.Title}».";
-        _sound.PlayPlaceBlock();
+        _sound?.PlayPlaceBlock();
     }
 
     public void AutoFillBuilder()
     {
         Builder.AutoFillFromCurrentBudget();
         StatusMessage = "Оба замка расставлены по текущему бюджету.";
-        _sound.PlayPlaceBlock();
+        _sound?.PlayPlaceBlock();
     }
 
     public void ClearBuilder()
     {
         Builder.ClearGrids();
         StatusMessage = "Обе сетки очищены. Блоки возвращены в запас.";
-        _sound.PlayRemoveBlock();
+        _sound?.PlayRemoveBlock();
     }
 
     public void HandleBuilderClick(PointF worldPt, bool isRightClick)
@@ -455,8 +453,8 @@ public sealed class GameEngine : IDisposable
         if (ok)
         {
             StatusMessage = msg;
-            if (isRightClick) _sound.PlayRemoveBlock();
-            else _sound.PlayPlaceBlock();
+            if (isRightClick) _sound?.PlayRemoveBlock();
+            else _sound?.PlayPlaceBlock();
         }
         else
         {
@@ -756,7 +754,7 @@ public sealed class GameEngine : IDisposable
             p.Y = y + ny * (p.Radius + 0.5f);
             if (!leavingSurface)
             {
-                _sound.PlayRicochet();
+                _sound?.PlayRicochet();
                 Explosions.Add(new ExplosionEffect(
                     new PointF(x, y), 16f, sparkColor, 0.18f));
             }
@@ -776,7 +774,7 @@ public sealed class GameEngine : IDisposable
     private void ExplodeProjectile(Projectile p, Block? directBlock)
     {
         bool heavy = p is RicochetProjectile;
-        _sound.PlayExplosion(heavy);
+        _sound?.PlayExplosion(heavy);
 
         Explosions.Add(new ExplosionEffect(
             new PointF(p.X, p.Y),
@@ -905,7 +903,7 @@ public sealed class GameEngine : IDisposable
                 king.HasShield = true;
                 FloatingTexts.Add(new FloatingText(
                     "+1 Щит Короля!", pos, Color.DeepSkyBlue));
-                _sound.PlayCrateBonus();
+                _sound?.PlayCrateBonus();
             }
             else
             {
@@ -927,7 +925,7 @@ public sealed class GameEngine : IDisposable
             {
                 FloatingTexts.Add(new FloatingText(
                     $"Ремонт (+{repaired} бл.)", pos, Color.LimeGreen));
-                _sound.PlayCrateBonus();
+                _sound?.PlayCrateBonus();
             }
             else
             {
@@ -943,7 +941,7 @@ public sealed class GameEngine : IDisposable
             _aimFog[opponent] = true;
             FloatingTexts.Add(new FloatingText(
                 "Туман прицела врагу!", pos, Color.MediumPurple));
-            _sound.PlayCrateDebuff();
+            _sound?.PlayCrateDebuff();
         }
         else
         {
@@ -966,7 +964,7 @@ public sealed class GameEngine : IDisposable
 
             FloatingTexts.Add(new FloatingText(
                 $"Диверсия (-{hits} HP врагу)!", pos, Color.Crimson));
-            _sound.PlayCrateDebuff();
+            _sound?.PlayCrateDebuff();
         }
     }
 
@@ -983,7 +981,7 @@ public sealed class GameEngine : IDisposable
                 : "+1 Рикошет!",
             pos,
             Color.Gold));
-        _sound.PlayCrateBonus();
+        _sound?.PlayCrateBonus();
     }
 
     private bool UpdateBlockTargets() =>
@@ -1019,7 +1017,7 @@ public sealed class GameEngine : IDisposable
             Phase = GamePhase.GameOver;
             IsDraw = true;
             StatusMessage = "Ничья! Оба Короля пали в одном ходу!";
-            _sound.PlayVictory();
+            _sound?.PlayVictory();
             return;
         }
 
@@ -1045,7 +1043,7 @@ public sealed class GameEngine : IDisposable
                     : "Победа Красного замка!";
             }
 
-            _sound.PlayVictory();
+            _sound?.PlayVictory();
             return;
         }
 
@@ -1110,7 +1108,7 @@ public sealed class GameEngine : IDisposable
     private bool RejectAction(string message)
     {
         StatusMessage = message;
-        _sound.PlayError();
+        _sound?.PlayError();
         return false;
     }
 

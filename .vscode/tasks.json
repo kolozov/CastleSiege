@@ -1,0 +1,59 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "dotnet: format",
+            "type": "shell",
+            "command": "dotnet format whitespace CastleSiege.sln",
+            "problemMatcher": [],
+            "detail": "Auto-fix whitespace formatting"
+        },
+        {
+            "label": "dotnet: lint",
+            "type": "shell",
+            "command": "dotnet format whitespace CastleSiege.sln --verify-no-changes",
+            "problemMatcher": [],
+            "detail": "Verify formatting with dotnet format"
+        },
+        {
+            "label": "dotnet: build",
+            "type": "shell",
+            "command": "dotnet build CastleSiege.sln -warnaserror",
+            "problemMatcher": "$msCompile",
+            "detail": "Build solution treating warnings as errors"
+        },
+        {
+            "label": "dotnet: lint & build",
+            "type": "shell",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "dotnet: lint",
+                "dotnet: build"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [],
+            "detail": "Run linter and strict build"
+        },
+        {
+            "label": "dotnet: test",
+            "type": "shell",
+            "command": "dotnet test CastleSiege.sln",
+            "problemMatcher": [],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "detail": "Run xUnit unit tests"
+        },
+        {
+            "label": "dotnet: run",
+            "type": "shell",
+            "command": "dotnet run --project CastleSiege",
+            "problemMatcher": "$msCompile",
+            "detail": "Run CastleSiege game"
+        }
+    ]
+}
